@@ -1,0 +1,305 @@
+# Connectors Reference
+
+Connectors are the modular building blocks that execute actions in an OwlFlow workflow. Each connector exposes a set of actions that take input parameters, perform operations (HTTP calls, API mutations, log writes, data filtering), and return structured outputs.
+
+---
+
+## 1. HTTP Connector (`http`)
+
+Performs standard HTTP requests.
+
+### `http.get`
+Executes an HTTP GET request.
+
+**Parameters:**
+- `url` (`string`, required): Target URL.
+
+**Output:**
+```json
+{
+  "status_code": 200,
+  "body": "string response"
+}
+```
+
+### `http.post`
+Executes an HTTP POST request.
+
+**Parameters:**
+- `url` (`string`, required): Target URL.
+- `headers` (`map[string]string`, optional): HTTP request headers.
+- `body` (`string`, optional): Raw payload string or serialized JSON.
+
+**Output:**
+```json
+{
+  "status_code": 201,
+  "body": "{\"id\": 123}"
+}
+```
+
+---
+
+## 2. GitLab Connector (`gitlab`)
+
+Integrates with the GitLab REST API (v4). Authentication uses the `GITLAB_TOKEN` environment variable or an explicit `token` parameter.
+
+### `gitlab.get_project`
+Fetches metadata for a GitLab repository.
+
+**Parameters:**
+- `project_id` (`int` / `string`, required): GitLab project ID or URL-encoded path.
+- `base_url` (`string`, optional): GitLab instance URL (default: `https://gitlab.com/api/v4`).
+- `token` (`string`, optional): Personal Access Token (defaults to `GITLAB_TOKEN` env).
+
+**Output:** GitLab Project JSON object (e.g. `id`, `name`, `web_url`, `default_branch`, etc.).
+
+---
+
+### `gitlab.create_merge_request`
+Opens a new merge request.
+
+**Parameters:**
+- `project_id` (`int` / `string`, required): GitLab project ID.
+- `source_branch` (`string`, required): Name of the branch containing changes.
+- `target_branch` (`string`, required): Branch to merge into.
+- `title` (`string`, required): Title of the Merge Request.
+
+---
+
+### `gitlab.add_reviewer`
+Assigns a user as a reviewer on an existing MR without overwriting existing reviewers.
+
+**Parameters:**
+- `project_id` (`int` / `string`, required): GitLab project ID.
+- `merge_request_iid` (`int` / `string`, required): Internal IID of the Merge Request.
+- `user_id` (`int`, required): GitLab user ID to add as a reviewer.
+- `current_reviewer_ids` (`string` / `array`, optional): Optional pre-fetched list of reviewer IDs to skip extra API lookups.
+
+---
+
+### `gitlab.approve_mr`
+Approves a Merge Request (with duplicate approval prevention).
+
+**Parameters:**
+- `project_id` (`int` / `string`, required): GitLab project ID.
+- `merge_request_iid` (`int` / `string`, required): Internal IID of the Merge Request.
+- `user_id` (`int`, optional): Approver's user ID to check if already approved.
+
+---
+
+### `gitlab.add_mr_note`
+Posts a comment/note to a Merge Request discussion.
+
+**Parameters:**
+- `project_id` (`int` / `string`, required): GitLab project ID.
+- `merge_request_iid` (`int` / `string`, required): Internal IID of the Merge Request.
+- `body` (`string`, required): Markdown content for the comment.
+
+---
+
+### `gitlab.close_mr`
+Closes an open Merge Request.
+
+**Parameters:**
+- `project_id` (`int` / `string`, required): GitLab project ID.
+- `merge_request_iid` (`int` / `string`, required): Internal IID of the Merge Request.
+
+---
+
+### `gitlab.get_user`
+Looks up a GitLab user by username.
+
+**Parameters:**
+- `username` (`string`, required): The GitLab username.
+
+---
+
+## 3. Jira Connector (`jira`)
+
+Integrates with the Atlassian Jira Cloud REST API (v3). Authentication uses `JIRA_USER` (email) and `JIRA_TOKEN` (API token).
+
+### `jira.transition_issue`
+Transitions a Jira issue to a new status workflow state.
+
+**Parameters:**
+- `issue_key` (`string`, required): Jira issue key (e.g. `"PROJ-123"`).
+- `transition_id` (`int` / `string`, required): Jira workflow transition ID.
+- `from_status_id` (`int` / `string`, optional): If specified, verifies current status matches before transitioning; otherwise returns `{"status": "skipped"}`.
+- `base_url` (`string`, optional): Base URL (e.g. `https://your-domain.atlassian.net` or `https://api.atlassian.com/ex/jira/<cloud-id>`).
+
+**Output:**
+```json
+{
+  "status": "success"
+}
+```
+
+---
+
+### `jira.search_issues`
+Searches for Jira issues using JQL (Jira Query Language).
+
+**Parameters:**
+- `jql` (`string`, required): JQL search query (e.g. `'project = PROJ AND status = "Ready for Test"'`).
+- `base_url` (`string`, optional): Base Jira URL.
+
+**Output:**
+```json
+{
+  "total": 3,
+  "found": true
+}
+```
+
+---
+
+## 4. Logger Connector (`logger`)
+
+Outputs structured, timestamped JSON logs to standard output and/or a local/remote Syslog daemon.
+
+### Actions: `logger.info`, `logger.debug`, `logger.warn`, `logger.error`
+
+**Parameters:**
+- `message` (`string`, required): Log message text.
+- `fields` (`map[string]interface{}`, optional): Key-value metadata attached to the log entry.
+- `syslog` (`bool`, optional): When `true`, explicitly sends the log entry to Syslog for this step.
+
+**Environment Variables for Syslog:**
+- `SYSLOG_ENABLED`: Set to `"true"` to enable Syslog for all logger steps.
+- `SYSLOG_ADDR`: Remote Syslog address (e.g. `"127.0.0.1:514"` or `"syslog.internal:514"`).
+- `SYSLOG_NETWORK`: `"udp"` or `"tcp"` (defaults to `"udp"` for remote, or local `/dev/log` socket if empty).
+- `SYSLOG_TAG`: Syslog program tag (default: `"owlflow"`).
+- `SYSLOG_ONLY`: Set to `"true"` to forward logs exclusively to Syslog and suppress stdout.
+
+**Example Output:**
+```json
+{
+  "timestamp": "2026-08-20T12:00:00Z",
+  "level": "INFO",
+  "workflow": "github-monitor",
+  "message": "PR verified successfully",
+  "fields": {
+    "repo": "divmora/owlflow",
+    "pr_number": 42
+  }
+}
+```
+
+---
+
+## 5. Internal Data Connector (`internal`)
+
+Utilities for transforming, validating, and filtering data within the workflow context.
+
+### `internal.contains`
+Checks whether a list contains a specified element.
+
+**Parameters:**
+- `list` (`array` / `JSON string`, required): Array to search.
+- `item` (`string`, required): Item to check.
+
+**Output:**
+```json
+{
+  "found": true
+}
+```
+
+---
+
+### `internal.startsWith`
+Checks whether a string starts with any prefix from a list.
+
+**Parameters:**
+- `list` (`array of strings` / `JSON string`, required): Allowed prefixes.
+- `item` (`string`, required): String to test.
+
+**Output:**
+```json
+{
+  "found": true
+}
+```
+
+---
+
+### `internal.regexMatch`
+Tests a string against a regular expression pattern.
+
+**Parameters:**
+- `regex` (`string`, required): Regular expression (e.g. `"(?i)^PROJ-\\d+$"`).
+- `item` (`string`, required): Input text to match.
+
+**Output:**
+```json
+{
+  "match": true
+}
+```
+
+---
+
+### `internal.parseJson`
+Parses a raw JSON string into a structured object/map.
+
+**Parameters:**
+- `data` (`string`, required): Raw JSON string.
+
+---
+
+### `internal.getField`
+Extracts a key from a map object.
+
+**Parameters:**
+- `data` (`map`, required): Source object.
+- `field` (`string`, required): Key name to retrieve.
+
+---
+
+## Writing a Custom Connector
+
+To create a new connector (e.g. `slack` or `aws`):
+
+1. Implement the `Connector` interface in `internal/connectors/`:
+
+```go
+package connectors
+
+import "fmt"
+
+type SlackConnector struct{}
+
+func (s *SlackConnector) Execute(action string, params map[string]interface{}) (interface{}, error) {
+    switch action {
+    case "sendMessage":
+        channel := params["channel"].(string)
+        text := params["text"].(string)
+        // ... perform API call ...
+        return map[string]string{"status": "sent"}, nil
+    default:
+        return nil, fmt.Errorf("unknown action: %s", action)
+    }
+}
+
+func (s *SlackConnector) Validate(params map[string]interface{}) error {
+    if _, ok := params["channel"]; !ok {
+        return fmt.Errorf("missing channel parameter")
+    }
+    return nil
+}
+```
+
+2. Register the connector in `internal/connectors/base.go`:
+
+```go
+var Registry = map[string]Connector{
+    "internal": &InternalConnector{},
+    "http":     &HTTPConnector{},
+    "gitlab":   &GitLabConnector{},
+    "jira":     &JiraConnector{},
+    "logger":   &LoggerConnector{MinLevel: "info"},
+    "slack":    &SlackConnector{}, // Register here
+}
+```
+

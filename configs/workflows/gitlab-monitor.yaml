@@ -1,0 +1,30 @@
+id: "gitlab-monitor"
+name: "GitLab Repository Monitor"
+status: "disabled"
+trigger:
+  type: "webhook"
+  config:
+    path: "/gitlab-webhook"
+    initial_step: "get_project_details"
+steps:
+  - id: "get_project_details"
+    action: "gitlab.get_project"
+    params:
+      project_id: "{{ .trigger.payload.project.id }}"
+    next_steps:
+      - step_id: "log_project"
+        condition: '{{ .steps.get_project_details.output.name }} != ""'
+      - step_id: "log_error"
+        condition: '{{ .steps.get_project_details.output.name }} == ""'
+
+  - id: "log_project"
+    action: "logger.info"
+    params:
+      message: "Processing GitLab Project: {{ .steps.get_project_details.output.name_with_namespace }}"
+      fields:
+        url: "{{ .steps.get_project_details.output.web_url }}"
+
+  - id: "log_error"
+    action: "logger.error"
+    params:
+      message: "Failed to fetch GitLab project details"
