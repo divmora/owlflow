@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"text/template"
 	"time"
 )
 
@@ -15,7 +14,7 @@ func evaluateCondition(condition string, ctx ExecutionContext) (bool, error) {
 		return true, nil
 	}
 
-	tmpl, err := template.New("cond").Parse(condition)
+	tmpl, err := createTemplate().Parse(condition)
 	if err != nil {
 		return false, err
 	}
@@ -42,6 +41,11 @@ func evaluateCondition(condition string, ctx ExecutionContext) (bool, error) {
 }
 
 func evalSimpleExpr(expr string) bool {
+	expr = strings.TrimSpace(expr)
+	if expr == "" {
+		return true
+	}
+
 	// Handle OR
 	if strings.Contains(expr, " || ") {
 		parts := strings.Split(expr, " || ")
@@ -64,6 +68,11 @@ func evalSimpleExpr(expr string) bool {
 		return true
 	}
 
+	// Handle Negation (!)
+	if strings.HasPrefix(expr, "!") && !strings.Contains(expr, "!=") {
+		return !evalSimpleExpr(strings.TrimSpace(expr[1:]))
+	}
+
 	// Handle Equality
 	if strings.Contains(expr, " == ") {
 		parts := strings.Split(expr, " == ")
@@ -80,14 +89,65 @@ func evalSimpleExpr(expr string) bool {
 		}
 	}
 
-	// Handle hasPrefix
-	if strings.HasPrefix(strings.TrimSpace(expr), "hasPrefix ") {
-		expr = strings.TrimSpace(expr)
-		parts := strings.SplitN(expr, " ", 3)
-		if len(parts) == 3 {
-			item := normalizeExprValue(parts[1])
-			prefix := normalizeExprValue(parts[2])
-			return strings.HasPrefix(item, prefix)
+	// Handle Relational operators (<=, >=, <, >)
+	if strings.Contains(expr, " <= ") {
+		parts := strings.Split(expr, " <= ")
+		if len(parts) == 2 {
+			v1, err1 := strconv.ParseFloat(normalizeExprValue(parts[0]), 64)
+			v2, err2 := strconv.ParseFloat(normalizeExprValue(parts[1]), 64)
+			if err1 == nil && err2 == nil {
+				return v1 <= v2
+			}
+		}
+	}
+	if strings.Contains(expr, " >= ") {
+		parts := strings.Split(expr, " >= ")
+		if len(parts) == 2 {
+			v1, err1 := strconv.ParseFloat(normalizeExprValue(parts[0]), 64)
+			v2, err2 := strconv.ParseFloat(normalizeExprValue(parts[1]), 64)
+			if err1 == nil && err2 == nil {
+				return v1 >= v2
+			}
+		}
+	}
+	if strings.Contains(expr, " < ") {
+		parts := strings.Split(expr, " < ")
+		if len(parts) == 2 {
+			v1, err1 := strconv.ParseFloat(normalizeExprValue(parts[0]), 64)
+			v2, err2 := strconv.ParseFloat(normalizeExprValue(parts[1]), 64)
+			if err1 == nil && err2 == nil {
+				return v1 < v2
+			}
+		}
+	}
+	if strings.Contains(expr, " > ") {
+		parts := strings.Split(expr, " > ")
+		if len(parts) == 2 {
+			v1, err1 := strconv.ParseFloat(normalizeExprValue(parts[0]), 64)
+			v2, err2 := strconv.ParseFloat(normalizeExprValue(parts[1]), 64)
+			if err1 == nil && err2 == nil {
+				return v1 > v2
+			}
+		}
+	}
+
+	// Handle hasPrefix (support both "hasPrefix item prefix" and "hasPrefix(item, prefix)")
+	if strings.HasPrefix(expr, "hasPrefix ") || strings.HasPrefix(expr, "hasPrefix(") {
+		if strings.HasPrefix(expr, "hasPrefix(") && strings.HasSuffix(expr, ")") {
+			inner := strings.TrimSuffix(strings.TrimPrefix(expr, "hasPrefix("), ")")
+			parts := strings.SplitN(inner, ",", 2)
+			if len(parts) == 2 {
+				item := normalizeExprValue(parts[0])
+				prefix := normalizeExprValue(parts[1])
+				return strings.HasPrefix(item, prefix)
+			}
+		} else {
+			parts := strings.SplitN(expr, " ", 3)
+			if len(parts) == 3 {
+				item := normalizeExprValue(parts[1])
+				prefix := normalizeExprValue(parts[2])
+				return strings.HasPrefix(item, prefix)
+			}
 		}
 	}
 

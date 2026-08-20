@@ -103,9 +103,19 @@ next_steps:
     condition: '{{ .steps.check_a.output.status }} == "error" || {{ .steps.check_b.output.status }} == "error"'
 ```
 
-### Prefix Matching (`hasPrefix`)
+### Prefix Matching & Negation (`hasPrefix`, `!`)
 ```yaml
 next_steps:
   - step_id: "approve_feature_mr"
     condition: 'hasPrefix {{ .trigger.payload.source_branch }} "feat/" && {{ .trigger.payload.author_id }} == 42'
+
+  - step_id: "reject_non_ai_mr"
+    condition: '!hasPrefix {{ .trigger.payload.source_branch }} "ai/" && {{ .trigger.payload.target_branch }} == "main"'
+```
+
+### Relational Comparisons (`<`, `<=`, `>`, `>=`)
+```yaml
+next_steps:
+  - step_id: "alert_high_latency"
+    condition: '{{ .steps.ping.output.duration_ms }} >= 500 && {{ .steps.ping.output.retries }} < 3'
 ```
