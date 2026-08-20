@@ -9,6 +9,9 @@ dist/
 *.so
 *.dylib
 
+# Node.js dependencies
+node_modules/
+
 # Environment variables & secrets
 .env
 .env.*
@@ -45,3 +48,17 @@ Thumbs.db
 # Test and coverage artifacts
 *.out
 coverage.html
+
+# Ephemeral agent work directories (preserves skills, commands, rules, and configurations)
+.agents/worker_*
+.agents/auditor_*
+.agents/reviewer_*
+.agents/challenger_*
+.agents/victory_auditor_*
+.agents/sentinel_*
+.agents/orchestrator_*
+.agents/explorer_*
+!.agents/skills/
+!.agents/commands/
+!.agents/rules/
+!.agents/plugins/

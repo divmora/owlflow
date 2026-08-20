@@ -59,24 +59,46 @@ docker run -d \
   owlflow:latest
 ```
 
-### Docker Compose Example (`docker-compose.yml`)
+### Docker Compose (Backend Engine + Developer UI)
 ```yaml
-version: '3.8'
-
 services:
   owlflow:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: owlflow-server
     ports:
       - "8080:8080"
     environment:
       - PORT=8080
-      - GITLAB_TOKEN=${GITLAB_TOKEN}
-      - JIRA_USER=${JIRA_USER}
-      - JIRA_TOKEN=${JIRA_TOKEN}
-      - JIRA_BASE_URL=${JIRA_BASE_URL}
+      - GITLAB_TOKEN=${GITLAB_TOKEN:-}
+      - JIRA_USER=${JIRA_USER:-}
+      - JIRA_TOKEN=${JIRA_TOKEN:-}
+      - JIRA_BASE_URL=${JIRA_BASE_URL:-}
     volumes:
-      - ./configs/workflows:/app/configs/workflows:ro
+      - ./configs/workflows:/app/configs/workflows
     restart: unless-stopped
+
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    container_name: owlflow-ui
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    volumes:
+      - ./ui:/app
+      - /app/node_modules
+    restart: unless-stopped
+    depends_on:
+      - owlflow
+```
+
+Run both services with:
+```bash
+docker compose up --build
 ```
 
 ---

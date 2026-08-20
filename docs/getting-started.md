@@ -172,7 +172,29 @@ And check your terminal to see the step execution flow through `log_incoming` âž
 
 ---
 
-## 6. Troubleshooting & Tips
+## 6. Visualizing & Testing with the Developer UI
+
+OwlFlow includes an interactive web UI for visually constructing, validating, and testing workflows:
+
+```bash
+# Option 1: Run with Docker Compose (Engine + UI)
+docker compose up --build
+
+# Option 2: Run UI locally with pnpm
+cd ui
+pnpm install
+pnpm dev
+```
+
+Open **http://localhost:5173** to:
+- Browse or paste workflow YAML definitions.
+- Inspect real-time syntax and schema diagnostics.
+- View the interactive DAG flowchart with color-coded connector actions and condition branch labels.
+- Test-run conditions and template interpolation using the client-side dry-run simulator.
+
+---
+
+## 7. Troubleshooting & Tips
 
 - **Workflow Status**: Ensure `status: "active"` is set in your YAML file. Workflows marked `disabled` or `draft` will not run.
 - **File Name vs ID**: The YAML file name should match the `id` field (e.g. `webhook-demo.yaml` with `id: "webhook-demo"`).

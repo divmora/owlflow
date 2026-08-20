@@ -2,6 +2,7 @@
 
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://golang.org)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/divmora/owlflow)
 
 **OwlFlow** is a lightweight, high-performance, and extensible workflow automation engine written in Go. It enables event-driven and scheduled workflow execution with declarative YAML/JSON configurations, dynamic templating, conditional branching, and modular connectors.
 
@@ -16,6 +17,7 @@
   - **Cron Schedules**: Sub-minute and second-precision scheduling with optional timezone support.
 - 🔌 **Extensible Connectors**: Built-in connectors for **HTTP**, **GitLab**, **Jira**, **Logger**, and **Internal Data Processing**, with an interface to easily register custom connectors.
 - 📝 **Powerful Templating Engine**: Evaluate dynamic parameters and condition expressions using Go templating with built-in helpers (`toJson`, `toPrettyJson`, `first`, `index`, `hasPrefix`).
+- 🖥️ **Developer UI & Visualizer**: Interactive web UI (React + Vite + Tailwind) with real-time YAML validation, interactive DAG flowcharts, condition inspection, and client-side dry-run simulation.
 - ☁️ **Cloud Native & Serverless Ready**: Runs seamlessly as a standalone microservice, Docker container, or AWS Lambda function (via AWS Lambda Web Adapter).
 
 ---
@@ -79,7 +81,8 @@ owlflow/
 │   ├── configuration.md          # Workflow syntax and schema reference
 │   ├── connectors.md             # Built-in connectors reference & custom connectors
 │   ├── templating-and-conditions.md # Templating helpers & condition expressions
-│   └── deployment.md             # Docker and AWS Lambda deployment guide
+│   ├── deployment.md             # Docker and AWS Lambda deployment guide
+│   └── ui.md                     # Developer UI and simulator reference
 ├── internal/
 │   ├── connectors/               # Connector implementations
 │   │   ├── base.go               # Connector interface and registry
@@ -96,6 +99,12 @@ owlflow/
 │   │   └── workflow.go           # Workflow domain models and validation
 │   └── server/
 │       └── api.go                # Gin API routes and webhook security
+├── ui/                           # Standalone React + Vite + Tailwind Developer UI
+│   ├── src/                      # UI components, DAG canvas, simulator engine
+│   ├── Dockerfile                # Dev container with hot reloading
+│   └── package.json              # Managed with pnpm
+├── AGENTS.md                     # Architecture & guidelines for AI coding agents
+├── docker-compose.yaml           # Multi-service local setup (Go engine + UI)
 ├── Dockerfile                    # Multi-stage container build with Lambda Adapter
 ├── go.mod
 ├── go.sum
@@ -131,6 +140,13 @@ go build -o owlflow cmd/server/main.go
 # Run
 ./owlflow
 ```
+
+### Option D: Run with Docker Compose (Backend + UI)
+```bash
+docker compose up --build
+```
+- **Backend API**: `http://localhost:8080`
+- **Developer UI**: `http://localhost:5173`
 
 ### Trigger a Webhook Workflow
 ```bash
@@ -214,7 +230,9 @@ Comprehensive guides and references are available in the [`docs/`](docs/) direct
 - ⚙️ **[Configuration Guide](docs/configuration.md)**: Complete YAML schema, triggers, step options, retries, and variables.
 - 🔌 **[Connectors Reference](docs/connectors.md)**: Details on all built-in actions (`http`, `gitlab`, `jira`, `logger`, `internal`) and how to build custom connectors.
 - 🔣 **[Templating & Conditions](docs/templating-and-conditions.md)**: Template functions (`toJson`, `first`, `index`, `hasPrefix`), context variables, and condition evaluation syntax.
-- 🐳 **[Deployment Guide](docs/deployment.md)**: Running via Docker, Kubernetes, and AWS Lambda (with AWS Lambda Web Adapter).
+- 🖥️ **[Developer UI & Visualizer](docs/ui.md)**: Interactive web UI, real-time validator, DAG flowchart, and dry-run simulator.
+- 🐳 **[Deployment Guide](docs/deployment.md)**: Running via Docker, Docker Compose, Kubernetes, and AWS Lambda.
+- 🤖 **[Agent Guidelines](AGENTS.md)**: Architecture, coding conventions, testing procedures, and guidelines for AI coding agents.
 
 ---
 
