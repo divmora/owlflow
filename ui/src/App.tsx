@@ -7,6 +7,7 @@ import { InspectorPanel } from './components/Inspector/InspectorPanel';
 import { SimulatorPanel } from './components/Simulator/SimulatorPanel';
 import { FileBrowserModal } from './components/FileBrowser/FileBrowserModal';
 import { ExportModal } from './components/Export/ExportModal';
+import { HelpModal } from './components/Help/HelpModal';
 import { SAMPLE_WORKFLOWS } from './samples/sampleWorkflows';
 import {
   FileCode,
@@ -15,6 +16,7 @@ import {
   UploadCloud,
   Sparkles,
   ArrowRight,
+  BookOpen,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
@@ -31,6 +33,7 @@ export const App: React.FC = () => {
 
   const [isFileBrowserOpen, setIsFileBrowserOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(true);
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
 
@@ -46,6 +49,7 @@ export const App: React.FC = () => {
       <Header
         onOpenFileBrowser={() => setIsFileBrowserOpen(true)}
         onOpenExport={() => setIsExportOpen(true)}
+        onOpenHelp={() => setIsHelpOpen(true)}
       />
 
       {/* Main Workspace */}
@@ -73,6 +77,14 @@ export const App: React.FC = () => {
                 >
                   <UploadCloud className="h-4 w-4" />
                   <span>Upload or Browse File</span>
+                </button>
+
+                <button
+                  onClick={() => setIsHelpOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-sky-400 font-semibold text-xs border border-sky-500/30 transition active:scale-95"
+                >
+                  <BookOpen className="h-4 w-4" />
+                  <span>Component Guide &amp; Cheat Sheet</span>
                 </button>
 
                 <button
@@ -216,6 +228,10 @@ export const App: React.FC = () => {
       <ExportModal
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
+      />
+      <HelpModal
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
       />
     </div>
   );

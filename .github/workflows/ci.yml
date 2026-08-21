@@ -9,8 +9,8 @@ on:
       - main
 
 jobs:
-  test:
-    name: Test & Build
+  backend-test:
+    name: Backend (Go) Tests & Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -33,3 +33,37 @@ jobs:
 
       - name: Build Application
         run: go build -v ./...
+
+  ui-test:
+    name: Frontend (UI) Tests & Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: 'ui/pnpm-lock.yaml'
+
+      - name: Install UI dependencies
+        run: |
+          cd ui
+          pnpm install --frozen-lockfile
+
+      - name: Run UI Vitest test suites
+        run: |
+          cd ui
+          pnpm test
+
+      - name: Build UI production bundle
+        run: |
+          cd ui
+          pnpm build

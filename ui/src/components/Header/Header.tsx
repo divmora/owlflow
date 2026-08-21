@@ -12,14 +12,20 @@ import {
   CheckCircle2,
   AlertCircle,
   Sparkles,
+  BookOpen,
 } from 'lucide-react';
 
 interface HeaderProps {
   onOpenFileBrowser: () => void;
   onOpenExport: () => void;
+  onOpenHelp?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenFileBrowser, onOpenExport }) => {
+export const Header: React.FC<HeaderProps> = ({
+  onOpenFileBrowser,
+  onOpenExport,
+  onOpenHelp = () => {},
+}) => {
   const {
     rawYaml,
     activeFileName,
@@ -123,6 +129,15 @@ export const Header: React.FC<HeaderProps> = ({ onOpenFileBrowser, onOpenExport 
         >
           <Download className="h-3.5 w-3.5 text-emerald-400" />
           <span className="hidden sm:inline">Export</span>
+        </button>
+
+        <button
+          onClick={onOpenHelp}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-sky-400 hover:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 transition shadow-sm"
+          title="Open Component & Syntax Guide"
+        >
+          <BookOpen className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Docs &amp; Guide</span>
         </button>
       </div>
 

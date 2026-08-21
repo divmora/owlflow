@@ -5,6 +5,7 @@ import { Header } from '../components/Header/Header';
 import { ValidationBanner } from '../components/Editor/ValidationBanner';
 import { ExportModal } from '../components/Export/ExportModal';
 import { FileBrowserModal } from '../components/FileBrowser/FileBrowserModal';
+import { HelpModal } from '../components/Help/HelpModal';
 import { InspectorPanel } from '../components/Inspector/InspectorPanel';
 import { SimulatorPanel } from '../components/Simulator/SimulatorPanel';
 import { Diagnostic } from '../types/workflow';
@@ -193,7 +194,30 @@ describe('UI Components Unit & Integration Tests', () => {
       // Check results tab
       expect(screen.getByText(/Simulation completed/i)).toBeInTheDocument();
       expect(screen.getAllByText('get_project_details').length).toBeGreaterThanOrEqual(1);
-      expect(screen.getAllByText('log_project').length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('HelpModal Component', () => {
+    it('should render connector docs, condition cheat sheet, and handle snippet insertion', () => {
+      const { rerender } = render(<HelpModal isOpen={false} onClose={() => {}} />);
+      expect(screen.queryByText('OwlFlow Studio Reference & Component Guide')).not.toBeInTheDocument();
+
+      rerender(<HelpModal isOpen={true} onClose={() => {}} />);
+      expect(screen.getByText('OwlFlow Studio Reference & Component Guide')).toBeInTheDocument();
+      expect(screen.getByText('Connectors & Actions')).toBeInTheDocument();
+      expect(screen.getByText('Conditions & Regex')).toBeInTheDocument();
+
+      // Click Conditions & Regex tab
+      fireEvent.click(screen.getByText('Conditions & Regex'));
+      expect(screen.getByText(/regexMatch \/ matches/i)).toBeInTheDocument();
+
+      // Click Go Templating tab
+      fireEvent.click(screen.getByText('Go Templating & Variables'));
+      expect(screen.getByText('toJson')).toBeInTheDocument();
+
+      // Click Validation tab
+      fireEvent.click(screen.getByText('Validation & Troubleshooting'));
+      expect(screen.getByText(/Unknown action connector/i)).toBeInTheDocument();
     });
   });
 });

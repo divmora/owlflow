@@ -1,8 +1,9 @@
-# Developer UI & Workflow Visualizer
+# Developer Studio & Workflow Visualizer
 
 OwlFlow includes an interactive, standalone developer web UI located in [`ui/`](../ui/) built with **React**, **Vite**, **Tailwind CSS**, and **React Flow**.
 
-It enables engineers to write, validate, inspect, and test-run workflow definitions visually without needing to trigger live webhooks or schedule actual cron jobs.
+- 🌐 **Live Web Playground**: [https://divmora.github.io/owlflow/](https://divmora.github.io/owlflow/)
+- 🚀 **Automated Deployment**: Built and deployed automatically to GitHub Pages via GitHub Actions on every merge to `main` and version release tag.
 
 ---
 
@@ -12,31 +13,40 @@ It enables engineers to write, validate, inspect, and test-run workflow definiti
    - Starts in a clean slate without automatically loading default workflows.
    - **File Browser / Loader**: Browse and open workflows from `configs/workflows/` or upload local `.yaml` / `.json` files directly from your computer.
 
-2. **Real-Time Schema Validation**:
+2. **Interactive Component Guide & Cheat Sheet**:
+   - Built-in documentation modal accessible directly from the header (`Docs & Guide`).
+   - Searchable dictionary of all 5 connectors (`http`, `gitlab`, `jira`, `logger`, `internal`), parameter shapes, return schemas, and 1-click step snippet insertion.
+   - Condition & regex syntax reference (`==`, `!=`, `<`, `<=`, `>`, `>=`, `hasPrefix`, `regexMatch`, `matches`, `!`, `&&`, `||`).
+   - Common validation error troubleshooting guide.
+
+3. **Real-Time Schema Validation**:
    - Embedded code editor with syntax highlighting, line numbers, and live error markers.
    - Real-time OwlFlow validation verifying trigger types, connector actions (`http.*`, `gitlab.*`, `jira.*`, `logger.*`, `internal.*`), required fields, retry bounds, and broken `step_id` references.
 
-3. **Interactive DAG Flowchart**:
+4. **Interactive DAG Flowchart**:
    - Directed acyclic graph (DAG) automatically rendered using React Flow.
    - Color-coded node badges by connector type (HTTP, GitLab, Jira, Logger, Internal).
-   - Condition badges on transition edges showing branching rules (`==`, `!=`, `hasPrefix`, `&&`, `||`).
+   - Condition badges on transition edges showing branching rules (`==`, `!=`, `hasPrefix`, `regexMatch`, `&&`, `||`).
    - Auto-layout, zoom, pan, and minimap navigation.
 
-4. **Node & Edge Inspector**:
+5. **Node & Edge Inspector**:
    - Click any step node to view action documentation, resolved parameters, retry count, and timeout limits.
    - Click any transition edge to inspect condition expressions and branch targets.
 
-5. **Client-Side Dry-Run Simulator**:
+6. **Client-Side Dry-Run Simulator**:
    - Provide mock trigger payloads (JSON body, HTTP headers, query parameters) and initial workflow variables.
    - Client-side Go-template resolution and condition evaluation.
    - Step-by-step or full execution trace highlighting the active execution path in green and skipped branches in gray.
 
-6. **Export & Sharing**:
+7. **Export & Sharing**:
    - Export formatted YAML or JSON, or copy directly to clipboard.
 
 ---
 
 ## Quick Start
+
+### Live Web Playground (No Installation)
+Visit **[https://divmora.github.io/owlflow/](https://divmora.github.io/owlflow/)**
 
 ### Using pnpm (Local Dev)
 ```bash

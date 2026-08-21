@@ -1,10 +1,13 @@
 # OwlFlow
 
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://golang.org)
+[![Live Studio](https://img.shields.io/badge/Live%20Studio-GitHub%20Pages-0284c7?style=flat&logo=github)](https://divmora.github.io/owlflow/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/divmora/owlflow)
 
 **OwlFlow** is a lightweight, high-performance, and extensible workflow automation engine written in Go. It enables event-driven and scheduled workflow execution with declarative YAML/JSON configurations, dynamic templating, conditional branching, and modular connectors.
+
+Try the **[OwlFlow Studio Live Playground](https://divmora.github.io/owlflow/)** directly in your browser.
 
 ---
 
@@ -16,8 +19,8 @@
   - **Webhooks**: REST endpoints supporting payload parsing (`JSON`, `form-data`), header inspection, and secret validation (GitLab token & GitHub HMAC SHA-256 signatures).
   - **Cron Schedules**: Sub-minute and second-precision scheduling with optional timezone support.
 - 🔌 **Extensible Connectors**: Built-in connectors for **HTTP**, **GitLab**, **Jira**, **Logger**, and **Internal Data Processing**, with an interface to easily register custom connectors.
-- 📝 **Powerful Templating Engine**: Evaluate dynamic parameters and condition expressions using Go templating with built-in helpers (`toJson`, `toPrettyJson`, `first`, `index`, `hasPrefix`).
-- 🖥️ **Developer UI & Visualizer**: Interactive web UI (React + Vite + Tailwind) with real-time YAML validation, interactive DAG flowcharts, condition inspection, and client-side dry-run simulation.
+- 📝 **Powerful Templating Engine**: Evaluate dynamic parameters and condition expressions using Go templating with built-in helpers (`toJson`, `toPrettyJson`, `first`, `index`, `hasPrefix`, `regexMatch`, `matches`).
+- 🖥️ **Developer Studio & Visualizer**: Interactive web UI (React + Vite + Tailwind) hosted on GitHub Pages with real-time YAML validation, interactive DAG flowcharts, built-in Component Guide & Cheat Sheet, and client-side dry-run simulation.
 - ☁️ **Cloud Native & Serverless Ready**: Runs seamlessly as a standalone microservice, Docker container, or AWS Lambda function (via AWS Lambda Web Adapter).
 
 ---
