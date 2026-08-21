@@ -120,4 +120,26 @@ describe('ConditionEvaluator', () => {
     const res = evaluator.evaluate('{{ .trigger.payload.missing_key }} == null', mockContext);
     expect(res.result).toBe(true);
   });
+
+  it('evaluates regexMatch and matches expressions with JS literal and RE2 patterns', () => {
+    expect(
+      evaluator.evaluate('regexMatch "CR/pre-prod-123" "/^cr\\/pre-prod-\\d+$/i"', mockContext).result
+    ).toBe(true);
+
+    expect(
+      evaluator.evaluate('regexMatch {{ .trigger.payload.branch }} "/^feat\\/.*$/i"', mockContext).result
+    ).toBe(true);
+
+    expect(
+      evaluator.evaluate('!regexMatch {{ .trigger.payload.branch }} "/^cr\\/pre-prod-\\d+$/i"', mockContext).result
+    ).toBe(true);
+
+    expect(
+      evaluator.evaluate('matches("CR/PRE-PROD-99", "(?i)^cr/pre-prod-\\d+$")', mockContext).result
+    ).toBe(true);
+
+    expect(
+      evaluator.evaluate('!matches "feature/foo" "/^cr\\/pre-prod-\\d+$/i"', mockContext).result
+    ).toBe(true);
+  });
 });

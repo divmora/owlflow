@@ -96,6 +96,41 @@ func TestEvaluateCondition(t *testing.T) {
 			condition: `{{ .steps.check_commit.output.status_code }} == 500 || {{ .vars.env }} == "production"`,
 			expected:  true,
 		},
+		{
+			name:      "regexMatch with JS-style literal and case-insensitive flag",
+			condition: `regexMatch "CR/pre-prod-123" "/^cr\\/pre-prod-\\d+$/i"`,
+			expected:  true,
+		},
+		{
+			name:      "regexMatch with RE2 flag",
+			condition: `regexMatch "cr/pre-prod-456" "(?i)^cr/pre-prod-\\d+$"`,
+			expected:  true,
+		},
+		{
+			name:      "regexMatch non-matching branch",
+			condition: `regexMatch "feature/my-feat" "/^cr\\/pre-prod-\\d+$/i"`,
+			expected:  false,
+		},
+		{
+			name:      "!regexMatch on non-matching branch",
+			condition: `!regexMatch "feature/my-feat" "/^cr\\/pre-prod-\\d+$/i"`,
+			expected:  true,
+		},
+		{
+			name:      "!regexMatch on matching branch",
+			condition: `!regexMatch "cr/pre-prod-12" "/^cr\\/pre-prod-\\d+$/i"`,
+			expected:  false,
+		},
+		{
+			name:      "matches alias functional syntax",
+			condition: `matches("CR/PRE-PROD-99", "/^cr\\/pre-prod-\\d+$/i")`,
+			expected:  true,
+		},
+		{
+			name:      "!matches with template variables and chained boolean",
+			condition: `{{ .trigger.payload.object_attributes.target_branch }} == "main" && !matches {{ .trigger.payload.object_attributes.source_branch }} "/^cr\\/pre-prod-\\d+$/i"`,
+			expected:  true,
+		},
 	}
 
 	for _, tt := range tests {

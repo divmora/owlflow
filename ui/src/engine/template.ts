@@ -56,6 +56,37 @@ export const TEMPLATE_FUNCTIONS: Record<string, (...args: any[]) => any> = {
     if (typeof str !== 'string' || typeof prefix !== 'string') return false;
     return str.startsWith(prefix);
   },
+
+  /**
+   * Tests if a string matches a regular expression pattern.
+   */
+  regexMatch: (arg1: any, arg2: any): boolean => {
+    const testPattern = (item: string, pat: string) => {
+      try {
+        if (pat.startsWith('/') && pat.lastIndexOf('/') > 0) {
+          const last = pat.lastIndexOf('/');
+          return new RegExp(pat.slice(1, last).replace(/\\\//g, '/'), pat.slice(last + 1)).test(item);
+        }
+        let flags = '';
+        let body = pat;
+        const fm = body.match(/^\(\?([ims]+)\)/);
+        if (fm) {
+          flags = fm[1];
+          body = body.slice(fm[0].length);
+        }
+        return new RegExp(body, flags).test(item);
+      } catch {
+        return false;
+      }
+    };
+    const s1 = String(arg1 ?? '');
+    const s2 = String(arg2 ?? '');
+    return testPattern(s1, s2) || testPattern(s2, s1);
+  },
+
+  matches: (arg1: any, arg2: any): boolean => {
+    return TEMPLATE_FUNCTIONS.regexMatch(arg1, arg2);
+  },
 };
 
 /**

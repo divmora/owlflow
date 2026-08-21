@@ -36,6 +36,7 @@ The following helper functions are registered in the template engine:
 | `first` | `first <slice>` | `{{ index .trigger.headers "User-Agent" \| first }}` | Returns the first item of a slice or array. |
 | `index` | `index <map/slice> <key>` | `{{ index .trigger.headers "X-Forwarded-For" }}` | Safely retrieves an item by key or index. |
 | `hasPrefix` | `hasPrefix <str> <prefix>` | `{{ hasPrefix .trigger.payload.ref "refs/heads/" }}` | Checks if a string starts with a given prefix. |
+| `regexMatch` / `matches` | `regexMatch <str> <regex>` | `{{ regexMatch .trigger.payload.ref "(?i)^refs/heads/feature" }}` | Tests if a string matches a regular expression. |
 
 ---
 
@@ -118,4 +119,22 @@ next_steps:
 next_steps:
   - step_id: "alert_high_latency"
     condition: '{{ .steps.ping.output.duration_ms }} >= 500 && {{ .steps.ping.output.retries }} < 3'
+```
+
+### Regex Matching (`regexMatch`, `matches`)
+Supports both JavaScript-style regex literals (`/.../flags`) and RE2 syntax (`(?i)...`), with optional unary negation (`!`):
+
+```yaml
+next_steps:
+  # Match release candidate branches case-insensitively using JS regex literal
+  - step_id: "deploy_candidate"
+    condition: 'regexMatch {{ .trigger.payload.object_attributes.source_branch }} "/^cr\/pre-prod-\d+$/i"'
+
+  # Reject invalid branches using negation
+  - step_id: "close_invalid_mr"
+    condition: '{{ .trigger.payload.object_attributes.target_branch }} == "main" && !regexMatch {{ .trigger.payload.object_attributes.source_branch }} "/^cr\/pre-prod-\d+$/i"'
+
+  # Using functional syntax or RE2 format
+  - step_id: "process_release"
+    condition: 'matches({{ .trigger.payload.branch }}, "(?i)^v[0-9]+\.[0-9]+\.[0-9]+$")'
 ```

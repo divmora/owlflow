@@ -90,8 +90,9 @@ export class ConditionParser {
       return node;
     }
 
-    // Function call: hasPrefix (prefix syntax e.g. "hasPrefix item prefix" or functional syntax "hasPrefix(item, prefix)")
-    if (this.peekIdentifier() === 'hasPrefix') {
+    // Function call: hasPrefix, regexMatch, matches (prefix syntax e.g. "hasPrefix item prefix" or functional syntax "hasPrefix(item, prefix)")
+    const funcName = this.peekIdentifier();
+    if (funcName === 'hasPrefix' || funcName === 'regexMatch' || funcName === 'matches') {
       this.consumeIdentifier();
       this.skipWhitespace();
       const args: ASTNode[] = [];
@@ -100,12 +101,12 @@ export class ConditionParser {
         while (this.match(',')) {
           args.push(this.parseOr());
         }
-        if (!this.match(')')) throw new Error('Expected ) after hasPrefix arguments');
+        if (!this.match(')')) throw new Error(`Expected ) after ${funcName} arguments`);
       } else {
         args.push(this.parsePrimary());
         args.push(this.parsePrimary());
       }
-      return { type: 'FunctionCall', name: 'hasPrefix', args };
+      return { type: 'FunctionCall', name: funcName, args };
     }
 
     // String Literal
@@ -302,12 +303,66 @@ export class ConditionEvaluator {
       return String(this.normalizeValue(item)).startsWith(String(this.normalizeValue(prefix)));
     }
 
+    // 8. regexMatch / matches
+    for (const fn of ['regexMatch', 'matches']) {
+      if (expr.startsWith(`${fn} `) || expr.startsWith(`${fn}(`)) {
+        let item = '';
+        let patternStr = '';
+        if (expr.startsWith(`${fn}(`) && expr.endsWith(')')) {
+          const inner = expr.slice(fn.length + 1, -1);
+          const parts = inner.split(',').map(s => s.trim());
+          item = String(this.resolveTermValue(parts[0], ctx) ?? '');
+          patternStr = String(this.resolveTermValue(parts[1], ctx) ?? '');
+        } else {
+          const parts = expr.split(/\s+/);
+          item = String(this.resolveTermValue(parts[1], ctx) ?? '');
+          patternStr = String(this.resolveTermValue(parts[2], ctx) ?? '');
+        }
+        return this.evalRegex(this.normalizeValue(item), this.normalizeValue(patternStr));
+      }
+    }
+
     // Fallback: Check boolean value
     const normalized = this.normalizeValue(expr);
     if (normalized === 'true' || normalized === true || normalized === '1') return true;
     if (normalized === 'false' || normalized === false || normalized === '0') return false;
 
     return Boolean(normalized);
+  }
+
+  private evalRegex(item: string, patternStr: string): boolean {
+    item = String(item ?? '');
+    patternStr = String(patternStr ?? '').trim();
+    if (!patternStr) return false;
+
+    // Check for JS regex literal: /pattern/flags
+    if (patternStr.startsWith('/') && patternStr.lastIndexOf('/') > 0) {
+      const lastSlash = patternStr.lastIndexOf('/');
+      const body = patternStr.slice(1, lastSlash).replace(/\\\//g, '/');
+      const flags = patternStr.slice(lastSlash + 1);
+      try {
+        const re = new RegExp(body, flags);
+        return re.test(item);
+      } catch {
+        return false;
+      }
+    }
+
+    // Check for Go RE2 flag syntax: (?i), (?m), etc.
+    let re2Flags = '';
+    let body = patternStr;
+    const flagMatch = body.match(/^\(\?([ims]+)\)/);
+    if (flagMatch) {
+      re2Flags = flagMatch[1];
+      body = body.slice(flagMatch[0].length);
+    }
+
+    try {
+      const re = new RegExp(body, re2Flags);
+      return re.test(item);
+    } catch {
+      return false;
+    }
   }
 
   private resolveTermValue(term: string, ctx: ExecutionContext): any {

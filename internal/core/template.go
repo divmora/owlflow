@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"text/template"
@@ -14,7 +15,25 @@ func createTemplate() *template.Template {
 		"first":        firstElement,
 		"index":        indexAccess,
 		"hasPrefix":    strings.HasPrefix,
+		"regexMatch":   templateRegexMatch,
+		"matches":      templateRegexMatch,
 	})
+}
+
+func templateRegexMatch(args ...interface{}) (bool, error) {
+	if len(args) < 2 {
+		return false, fmt.Errorf("regexMatch requires 2 arguments (item and regex)")
+	}
+	s1 := fmt.Sprintf("%v", args[0])
+	s2 := fmt.Sprintf("%v", args[1])
+
+	if matchRegex(s1, s2) {
+		return true, nil
+	}
+	if matchRegex(s2, s1) {
+		return true, nil
+	}
+	return false, nil
 }
 
 func toJson(data interface{}) (string, error) {

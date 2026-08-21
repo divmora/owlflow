@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -68,11 +69,6 @@ func evalSimpleExpr(expr string) bool {
 		return true
 	}
 
-	// Handle Negation (!)
-	if strings.HasPrefix(expr, "!") && !strings.Contains(expr, "!=") {
-		return !evalSimpleExpr(strings.TrimSpace(expr[1:]))
-	}
-
 	// Handle Equality
 	if strings.Contains(expr, " == ") {
 		parts := strings.Split(expr, " == ")
@@ -131,6 +127,11 @@ func evalSimpleExpr(expr string) bool {
 		}
 	}
 
+	// Handle Negation (!)
+	if strings.HasPrefix(expr, "!") {
+		return !evalSimpleExpr(strings.TrimSpace(expr[1:]))
+	}
+
 	// Handle hasPrefix (support both "hasPrefix item prefix" and "hasPrefix(item, prefix)")
 	if strings.HasPrefix(expr, "hasPrefix ") || strings.HasPrefix(expr, "hasPrefix(") {
 		if strings.HasPrefix(expr, "hasPrefix(") && strings.HasSuffix(expr, ")") {
@@ -151,9 +152,94 @@ func evalSimpleExpr(expr string) bool {
 		}
 	}
 
+	// Handle regexMatch and matches (support both prefix and functional syntax)
+	for _, fn := range []string{"regexMatch", "matches"} {
+		prefixSpace := fn + " "
+		prefixParen := fn + "("
+		if strings.HasPrefix(expr, prefixSpace) || strings.HasPrefix(expr, prefixParen) {
+			if strings.HasPrefix(expr, prefixParen) && strings.HasSuffix(expr, ")") {
+				inner := strings.TrimSuffix(strings.TrimPrefix(expr, prefixParen), ")")
+				parts := strings.SplitN(inner, ",", 2)
+				if len(parts) == 2 {
+					item := normalizeExprValue(parts[0])
+					pattern := normalizeExprValue(parts[1])
+					return matchRegex(item, pattern)
+				}
+			} else {
+				parts := strings.SplitN(expr, " ", 3)
+				if len(parts) == 3 {
+					item := normalizeExprValue(parts[1])
+					pattern := normalizeExprValue(parts[2])
+					return matchRegex(item, pattern)
+				}
+			}
+		}
+	}
+
 	// Fallback to literal boolean check
 	b, err := strconv.ParseBool(expr)
 	return err == nil && b
+}
+
+func parseRegexPattern(pattern string) (string, error) {
+	pattern = strings.TrimSpace(pattern)
+	pattern = strings.Trim(pattern, "\"")
+	pattern = strings.Trim(pattern, "'")
+	pattern = strings.TrimSpace(pattern)
+
+	// Check for JS-style regex literal: /pattern/flags
+	if strings.HasPrefix(pattern, "/") && strings.LastIndex(pattern, "/") > 0 {
+		lastSlash := strings.LastIndex(pattern, "/")
+		body := pattern[1:lastSlash]
+		flags := pattern[lastSlash+1:]
+
+		// unescape \/ to /
+		body = strings.ReplaceAll(body, `\/`, `/`)
+
+		flagPrefix := ""
+		if strings.Contains(flags, "i") && !strings.Contains(body, "(?i)") {
+			flagPrefix += "i"
+		}
+		if strings.Contains(flags, "m") && !strings.Contains(body, "(?m)") {
+			flagPrefix += "m"
+		}
+		if strings.Contains(flags, "s") && !strings.Contains(body, "(?s)") {
+			flagPrefix += "s"
+		}
+
+		if flagPrefix != "" {
+			body = "(?" + flagPrefix + ")" + body
+		}
+		return body, nil
+	}
+
+	return pattern, nil
+}
+
+func matchRegex(item, pattern string) bool {
+	parsedPattern, err := parseRegexPattern(pattern)
+	if err != nil {
+		return false
+	}
+	re, err := regexp.Compile(parsedPattern)
+	if err != nil {
+		// Fallback: try unescaping double backslashes
+		unescaped := strings.ReplaceAll(parsedPattern, `\\`, `\`)
+		re, err = regexp.Compile(unescaped)
+		if err != nil {
+			return false
+		}
+	}
+
+	matched := re.MatchString(item)
+	if !matched && strings.Contains(parsedPattern, `\\`) {
+		unescaped := strings.ReplaceAll(parsedPattern, `\\`, `\`)
+		if re2, err2 := regexp.Compile(unescaped); err2 == nil {
+			return re2.MatchString(item)
+		}
+	}
+
+	return matched
 }
 
 func normalizeExprValue(s string) string {
