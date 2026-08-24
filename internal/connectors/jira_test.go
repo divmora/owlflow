@@ -198,6 +198,17 @@ func TestJiraConnector_CheckUserComment(t *testing.T) {
 			expectedMatches:   0,
 			expectedTotal:     0,
 		},
+		{
+			name: "Match service account by email prefix when Jira omits emailAddress",
+			params: map[string]interface{}{
+				"issue_key": "PROJ-101",
+				"email":     "alice-123@serviceaccount.atlassian.com",
+				"base_url":  server.URL,
+			},
+			expectedCommented: true,
+			expectedMatches:   1,
+			expectedTotal:     3,
+		},
 	}
 
 	for _, tt := range tests {

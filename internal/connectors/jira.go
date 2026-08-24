@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -181,6 +182,9 @@ func (j *JiraConnector) Execute(action string, params map[string]interface{}) (i
 		bodyContains, _ := params["body_contains"].(string)
 		bodyRegex, _ := params["body_regex"].(string)
 
+		log.Printf("[JiraConnector] check_user_comment initiated: issue_key=%s, target_user=%q, email=%q, account_id=%q, display_name=%q, username=%q, body_contains=%q, body_regex=%q",
+			issueKey, targetUser, targetEmail, targetAccountID, targetDisplayName, targetUsername, bodyContains, bodyRegex)
+
 		maxResults := 100
 		if mr, ok := params["max_results"]; ok {
 			switch v := mr.(type) {
@@ -194,16 +198,21 @@ func (j *JiraConnector) Execute(action string, params map[string]interface{}) (i
 		commentsURL := fmt.Sprintf("%s/rest/api/3/issue/%s/comment?maxResults=%d&orderBy=-created", baseURL, url.PathEscape(issueKey), maxResults)
 		resp, err := j.makeRequest(client, "GET", commentsURL, username, token, nil)
 		if err != nil {
+			log.Printf("[JiraConnector] check_user_comment error fetching comments from %s: %v", commentsURL, err)
 			return nil, fmt.Errorf("failed to fetch comments: %w", err)
 		}
 
 		result, ok := resp.(map[string]interface{})
 		if !ok {
+			log.Printf("[JiraConnector] check_user_comment unexpected response payload format")
 			return nil, fmt.Errorf("unexpected response format from jira comments endpoint")
 		}
 
 		rawComments, _ := result["comments"].([]interface{})
 		parsedComments, authors, emails, accountIDs := parseJiraComments(rawComments)
+
+		log.Printf("[JiraConnector] issue %s has %d total comment(s). Authors in Jira: %v | AccountIDs: %v | Emails: %v",
+			issueKey, len(parsedComments), authors, accountIDs, emails)
 
 		var matchedComments []map[string]interface{}
 		var compiledRegex *regexp.Regexp
@@ -211,51 +220,105 @@ func (j *JiraConnector) Execute(action string, params map[string]interface{}) (i
 			var err error
 			compiledRegex, err = regexp.Compile(bodyRegex)
 			if err != nil {
+				log.Printf("[JiraConnector] invalid body_regex %q: %v", bodyRegex, err)
 				return nil, fmt.Errorf("invalid body_regex pattern: %w", err)
 			}
 		}
 
-		for _, comment := range parsedComments {
+		// Helper for extracting email username prefix (e.g. "fingrid-7efpyys0kh" from "fingrid-7efpyys0kh@serviceaccount.atlassian.com")
+		extractPrefix := func(s string) string {
+			if idx := strings.Index(s, "@"); idx > 0 {
+				return s[:idx]
+			}
+			return s
+		}
+
+		for idx, comment := range parsedComments {
 			isAuthorMatch := false
+			matchReason := ""
 
 			authorName := fmt.Sprintf("%v", comment["author_name"])
 			authorEmail := fmt.Sprintf("%v", comment["author_email"])
 			authorAccountID := fmt.Sprintf("%v", comment["author_account_id"])
 			authorUsername := fmt.Sprintf("%v", comment["author_username"])
+			commentID := fmt.Sprintf("%v", comment["id"])
+			bodyPreview := fmt.Sprintf("%v", comment["body_text"])
+			if len(bodyPreview) > 60 {
+				bodyPreview = bodyPreview[:60] + "..."
+			}
 
 			if targetAccountID != "" && authorAccountID == targetAccountID {
 				isAuthorMatch = true
-			} else if targetEmail != "" && strings.EqualFold(authorEmail, targetEmail) {
+				matchReason = fmt.Sprintf("exact accountId match (%s)", targetAccountID)
+			} else if targetEmail != "" && authorEmail != "" && strings.EqualFold(authorEmail, targetEmail) {
 				isAuthorMatch = true
+				matchReason = fmt.Sprintf("exact email match (%s)", targetEmail)
 			} else if targetDisplayName != "" && strings.EqualFold(authorName, targetDisplayName) {
 				isAuthorMatch = true
-			} else if targetUsername != "" && strings.EqualFold(authorUsername, targetUsername) {
+				matchReason = fmt.Sprintf("exact displayName match (%s)", targetDisplayName)
+			} else if targetUsername != "" && authorUsername != "" && strings.EqualFold(authorUsername, targetUsername) {
 				isAuthorMatch = true
+				matchReason = fmt.Sprintf("exact username match (%s)", targetUsername)
 			} else if targetUser != "" {
-				if authorAccountID == targetUser ||
-					strings.EqualFold(authorEmail, targetUser) ||
-					strings.EqualFold(authorName, targetUser) ||
-					strings.EqualFold(authorUsername, targetUser) {
+				if authorAccountID != "" && authorAccountID == targetUser {
 					isAuthorMatch = true
+					matchReason = fmt.Sprintf("user matched accountId (%s)", targetUser)
+				} else if authorEmail != "" && strings.EqualFold(authorEmail, targetUser) {
+					isAuthorMatch = true
+					matchReason = fmt.Sprintf("user matched email (%s)", targetUser)
+				} else if authorName != "" && strings.EqualFold(authorName, targetUser) {
+					isAuthorMatch = true
+					matchReason = fmt.Sprintf("user matched displayName (%s)", targetUser)
+				} else if authorUsername != "" && strings.EqualFold(authorUsername, targetUser) {
+					isAuthorMatch = true
+					matchReason = fmt.Sprintf("user matched username (%s)", targetUser)
+				} else if strings.Contains(targetUser, "@") {
+					// Fallback for Jira Cloud where emailAddress is masked/omitted for service accounts
+					userPrefix := extractPrefix(targetUser)
+					if userPrefix != "" && (strings.Contains(strings.ToLower(authorName), strings.ToLower(userPrefix)) ||
+						strings.Contains(strings.ToLower(authorAccountID), strings.ToLower(userPrefix)) ||
+						strings.Contains(strings.ToLower(authorUsername), strings.ToLower(userPrefix))) {
+						isAuthorMatch = true
+						matchReason = fmt.Sprintf("serviceaccount prefix fallback match (%s)", userPrefix)
+					}
+				}
+			} else if targetEmail != "" && strings.Contains(targetEmail, "@") {
+				// Fallback when email parameter was passed but Jira Cloud omitted emailAddress from author JSON
+				emailPrefix := extractPrefix(targetEmail)
+				if emailPrefix != "" && (strings.Contains(strings.ToLower(authorName), strings.ToLower(emailPrefix)) ||
+					strings.Contains(strings.ToLower(authorAccountID), strings.ToLower(emailPrefix)) ||
+					strings.Contains(strings.ToLower(authorUsername), strings.ToLower(emailPrefix))) {
+					isAuthorMatch = true
+					matchReason = fmt.Sprintf("email prefix fallback match (%s)", emailPrefix)
 				}
 			} else if targetAccountID == "" && targetEmail == "" && targetDisplayName == "" && targetUsername == "" {
 				// If no specific user filter is supplied, treat all comments as candidate for body match
 				isAuthorMatch = true
+				matchReason = "no user filter specified (matching all authors)"
 			}
 
 			if !isAuthorMatch {
+				log.Printf("[JiraConnector] comment #%d (ID: %s) did not match author criteria: authorName=%q, authorAccountID=%q, authorEmail=%q",
+					idx+1, commentID, authorName, authorAccountID, authorEmail)
 				continue
 			}
 
 			bodyText := fmt.Sprintf("%v", comment["body_text"])
 
 			if bodyContains != "" && !strings.Contains(strings.ToLower(bodyText), strings.ToLower(bodyContains)) {
+				log.Printf("[JiraConnector] comment #%d (ID: %s) matched author by %s, but failed body_contains filter %q",
+					idx+1, commentID, matchReason, bodyContains)
 				continue
 			}
 
 			if compiledRegex != nil && !compiledRegex.MatchString(bodyText) {
+				log.Printf("[JiraConnector] comment #%d (ID: %s) matched author by %s, but failed body_regex filter %q",
+					idx+1, commentID, matchReason, bodyRegex)
 				continue
 			}
+
+			log.Printf("[JiraConnector] -> MATCH SUCCESS on comment #%d (ID: %s) by %s: authorName=%q, authorAccountID=%q, snippet=%q",
+				idx+1, commentID, matchReason, authorName, authorAccountID, bodyPreview)
 
 			matchedComments = append(matchedComments, comment)
 		}
@@ -265,6 +328,9 @@ func (j *JiraConnector) Execute(action string, params map[string]interface{}) (i
 		if hasCommented {
 			latestComment = matchedComments[0]
 		}
+
+		log.Printf("[JiraConnector] check_user_comment completed for issue %s: commented=%t, match_count=%d, total_comments=%d",
+			issueKey, hasCommented, len(matchedComments), len(parsedComments))
 
 		return map[string]interface{}{
 			"commented":              hasCommented,
