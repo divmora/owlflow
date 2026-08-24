@@ -176,6 +176,97 @@ describe('DryRunSimulationEngine', () => {
     expect(regexRes.output).toEqual({ match: true });
   });
 
+  it('executes jira.check_user_comment and branches conditionally based on output', () => {
+    // 1. Action output check
+    const checkAlice = executeMockAction('jira.check_user_comment', {
+      issue_key: 'PROJ-101',
+      user: 'qa-lead@company.com',
+    });
+    expect(checkAlice.output.commented).toBe(true);
+    expect(checkAlice.output.found).toBe(true);
+
+    const checkUnknown = executeMockAction('jira.check_user_comment', {
+      issue_key: 'PROJ-101',
+      user: 'unknown-user@company.com',
+    });
+    expect(checkUnknown.output.commented).toBe(false);
+    expect(checkUnknown.output.found).toBe(false);
+
+    // 2. Workflow dry-run simulation branching
+    const jiraCommentWorkflow: Workflow = {
+      id: 'jira-comment-test',
+      name: 'Jira Comment Test',
+      status: 'active',
+      trigger: {
+        type: 'manual',
+        config: { initial_step: 'verify_comment' },
+      },
+      steps: [
+        {
+          id: 'verify_comment',
+          action: 'jira.check_user_comment',
+          params: {
+            issue_key: 'PROJ-101',
+            user: 'qa-lead@company.com',
+          },
+          next_steps: [
+            {
+              step_id: 'on_commented',
+              condition: '{{ .steps.verify_comment.output.commented }} == true',
+            },
+            {
+              step_id: 'on_not_commented',
+              condition: '{{ .steps.verify_comment.output.commented }} == false',
+            },
+          ],
+        },
+        {
+          id: 'on_commented',
+          action: 'logger.info',
+          params: { message: 'Comment verified!' },
+        },
+        {
+          id: 'on_not_commented',
+          action: 'logger.warn',
+          params: { message: 'No comment found.' },
+        },
+      ],
+    };
+
+    // Positive case -> on_commented executed, on_not_commented bypassed
+    const posResult = engine.simulate({
+      workflow: jiraCommentWorkflow,
+      triggerInput: { payload: {} },
+    });
+
+    expect(posResult.status).toBe('completed');
+    expect(posResult.executedStepIds).toContain('verify_comment');
+    expect(posResult.executedStepIds).toContain('on_commented');
+    expect(posResult.bypassedStepIds).toContain('on_not_commented');
+    expect(posResult.activeEdgeIds).toContain('verify_comment->on_commented');
+    expect(posResult.bypassedEdgeIds).toContain('verify_comment->on_not_commented');
+
+    // Negative case override -> on_not_commented executed, on_commented bypassed
+    const negResult = engine.simulate({
+      workflow: jiraCommentWorkflow,
+      triggerInput: { payload: {} },
+      stepMockOverrides: {
+        verify_comment: {
+          commented: false,
+          found: false,
+          match_count: 0,
+        },
+      },
+    });
+
+    expect(negResult.status).toBe('completed');
+    expect(negResult.executedStepIds).toContain('verify_comment');
+    expect(negResult.executedStepIds).toContain('on_not_commented');
+    expect(negResult.bypassedStepIds).toContain('on_commented');
+    expect(negResult.activeEdgeIds).toContain('verify_comment->on_not_commented');
+    expect(negResult.bypassedEdgeIds).toContain('verify_comment->on_commented');
+  });
+
   it('guards against infinite loops in cyclic workflows via maxExecutionSteps limit', () => {
     const cyclicWorkflow: Workflow = {
       id: 'loop-wf',

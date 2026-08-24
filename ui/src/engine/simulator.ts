@@ -146,6 +146,80 @@ export function executeMockAction(
               issues: [{ key: 'PROJ-101', fields: { summary: 'Sample Mock Issue' } }],
             },
           };
+        case 'get_comments':
+          return {
+            output: {
+              total: 2,
+              comments: [
+                {
+                  id: '1001',
+                  author_name: 'QA Lead',
+                  author_email: 'qa-lead@company.com',
+                  author_account_id: 'acc-qa-123',
+                  created: '2026-08-24T10:00:00.000Z',
+                  body_text: 'LGTM! Approved for release.',
+                },
+                {
+                  id: '1002',
+                  author_name: 'Lead Developer',
+                  author_email: 'dev@company.com',
+                  author_account_id: 'acc-dev-456',
+                  created: '2026-08-24T09:00:00.000Z',
+                  body_text: 'Ready for verification.',
+                },
+              ],
+              all_authors: ['QA Lead', 'Lead Developer'],
+              all_author_emails: ['qa-lead@company.com', 'dev@company.com'],
+              all_author_account_ids: ['acc-qa-123', 'acc-dev-456'],
+            },
+          };
+        case 'check_user_comment': {
+          const target = String(resolvedParams.user || resolvedParams.email || resolvedParams.account_id || resolvedParams.display_name || '').toLowerCase();
+          const mockComments = [
+            {
+              id: '1001',
+              author_name: 'QA Lead',
+              author_email: 'qa-lead@company.com',
+              author_account_id: 'acc-qa-123',
+              created: '2026-08-24T10:00:00.000Z',
+              body_text: 'LGTM! Approved for release.',
+            },
+            {
+              id: '1002',
+              author_name: 'Lead Developer',
+              author_email: 'dev@company.com',
+              author_account_id: 'acc-dev-456',
+              created: '2026-08-24T09:00:00.000Z',
+              body_text: 'Ready for verification.',
+            },
+          ];
+
+          const matched = mockComments.filter((c) => {
+            if (!target) return true;
+            return (
+              c.author_email.toLowerCase() === target ||
+              c.author_name.toLowerCase() === target ||
+              c.author_account_id.toLowerCase() === target ||
+              c.author_email.toLowerCase().includes(target) ||
+              c.author_name.toLowerCase().includes(target)
+            );
+          });
+
+          const commented = matched.length > 0;
+          return {
+            output: {
+              commented,
+              found: commented,
+              match_count: matched.length,
+              total_comments: mockComments.length,
+              matched_comments: matched,
+              latest_comment: matched[0] || null,
+              all_authors: ['QA Lead', 'Lead Developer'],
+              all_author_emails: ['qa-lead@company.com', 'dev@company.com'],
+              all_author_account_ids: ['acc-qa-123', 'acc-dev-456'],
+            },
+          };
+        }
       }
       break;
     }

@@ -154,6 +154,79 @@ Searches for Jira issues using JQL (Jira Query Language).
 
 ---
 
+### `jira.check_user_comment`
+Checks whether a specific user has commented on a Jira issue directly via the REST API (useful when JQL `commenter` / `commentedBy` is disabled or unsupported), with optional body filtering.
+
+**Parameters:**
+- `issue_key` (`string`, required): Jira issue key (e.g. `"PROJ-101"`).
+- `user` / `target_user` (`string`, optional): Target user identifier (checked across `accountId`, `emailAddress`, `displayName`, and `username` case-insensitively).
+- `account_id` (`string`, optional): Specific Atlassian `accountId` to match.
+- `email` (`string`, optional): Specific author email address to match.
+- `display_name` (`string`, optional): Specific author display name to match.
+- `body_contains` (`string`, optional): Substring filter for the comment body.
+- `body_regex` (`string`, optional): Regular expression pattern for the comment body.
+- `max_results` (`int`, optional): Number of recent comments to fetch (default: 100).
+- `base_url` (`string`, optional): Custom Jira base URL.
+
+**Output:**
+```json
+{
+  "commented": true,
+  "found": true,
+  "match_count": 1,
+  "total_comments": 4,
+  "matched_comments": [
+    {
+      "id": "10001",
+      "author_name": "Alice Smith",
+      "author_email": "alice@example.com",
+      "author_account_id": "5b10a2844c20165700ede21g",
+      "author_username": "asmith",
+      "created": "2026-08-24T10:00:00.000+0000",
+      "body_text": "LGTM! Approved for release."
+    }
+  ],
+  "latest_comment": {
+    "id": "10001",
+    "author_name": "Alice Smith",
+    "created": "2026-08-24T10:00:00.000+0000"
+  },
+  "all_authors": ["Alice Smith", "Bob Jones"],
+  "all_author_emails": ["alice@example.com", "bob@example.com"],
+  "all_author_account_ids": ["5b10a2844c20165700ede21g", "5c20b3955d30276800fee32h"]
+}
+```
+
+---
+
+### `jira.get_comments`
+Retrieves all comments and parsed author metadata for a Jira issue.
+
+**Parameters:**
+- `issue_key` (`string`, required): Jira issue key (e.g. `"PROJ-101"`).
+- `max_results` (`int`, optional): Max comments to retrieve (default: 100).
+- `base_url` (`string`, optional): Custom Jira base URL.
+
+**Output:**
+```json
+{
+  "total": 2,
+  "comments": [
+    {
+      "id": "10001",
+      "author_name": "Alice Smith",
+      "author_email": "alice@example.com",
+      "body_text": "LGTM!"
+    }
+  ],
+  "all_authors": ["Alice Smith"],
+  "all_author_emails": ["alice@example.com"],
+  "all_author_account_ids": ["5b10a2844c20165700ede21g"]
+}
+```
+
+---
+
 ## 4. Logger Connector (`logger`)
 
 Outputs structured, timestamped JSON logs to standard output and/or a local/remote Syslog daemon.
