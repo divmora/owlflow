@@ -5,9 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"regexp"
 	"strconv"
+	"strings"
 )
 
 type GitLabConnector struct{}
@@ -225,9 +229,282 @@ func (g *GitLabConnector) Execute(action string, params map[string]interface{}) 
 		}
 
 		return g.makeRequest(client, "POST", fmt.Sprintf("%s/projects/%v/merge_requests/%v/approve", baseURL, projectID, mrIID), token, nil)
+
+	case "get_mr_commits":
+		projectID, ok := params["project_id"]
+		if !ok || projectID == nil {
+			return nil, fmt.Errorf("missing project_id")
+		}
+
+		mrIID, ok := params["merge_request_iid"]
+		if !ok || mrIID == nil {
+			return nil, fmt.Errorf("missing merge_request_iid")
+		}
+
+		perPage := 100
+		if pp, ok := params["per_page"]; ok {
+			if v, err := toInt(pp); err == nil && v > 0 {
+				perPage = v
+			}
+		}
+
+		commitsURL := fmt.Sprintf("%s/projects/%v/merge_requests/%v/commits?per_page=%d", baseURL, url.PathEscape(fmt.Sprintf("%v", projectID)), mrIID, perPage)
+		resp, err := g.makeRequest(client, "GET", commitsURL, token, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch MR commits: %w", err)
+		}
+
+		rawCommits, ok := resp.([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("unexpected response format from gitlab MR commits endpoint")
+		}
+
+		parsedCommits, authors, authorEmails, committers, committerEmails := parseGitLabCommits(rawCommits)
+
+		return map[string]interface{}{
+			"total":                len(parsedCommits),
+			"commits":              parsedCommits,
+			"all_authors":          authors,
+			"all_author_emails":    authorEmails,
+			"all_committers":       committers,
+			"all_committer_emails": committerEmails,
+		}, nil
+
+	case "check_mr_commit_author":
+		projectID, ok := params["project_id"]
+		if !ok || projectID == nil {
+			return nil, fmt.Errorf("missing project_id")
+		}
+
+		mrIID, ok := params["merge_request_iid"]
+		if !ok || mrIID == nil {
+			return nil, fmt.Errorf("missing merge_request_iid")
+		}
+
+		targetUser, _ := params["user"].(string)
+		if targetUser == "" {
+			if tu, ok := params["target_user"].(string); ok {
+				targetUser = tu
+			}
+		}
+		targetEmail, _ := params["email"].(string)
+		if targetEmail == "" {
+			if te, ok := params["author_email"].(string); ok {
+				targetEmail = te
+			}
+		}
+		targetAuthorName, _ := params["author_name"].(string)
+		if targetAuthorName == "" {
+			if tan, ok := params["name"].(string); ok {
+				targetAuthorName = tan
+			}
+		}
+		targetCommitterEmail, _ := params["committer_email"].(string)
+
+		messageContains, _ := params["message_contains"].(string)
+		messageRegex, _ := params["message_regex"].(string)
+
+		log.Printf("[GitLabConnector] check_mr_commit_author initiated: project_id=%v, mr_iid=%v, target_user=%q, email=%q, author_name=%q, committer_email=%q, message_contains=%q, message_regex=%q",
+			projectID, mrIID, targetUser, targetEmail, targetAuthorName, targetCommitterEmail, messageContains, messageRegex)
+
+		perPage := 100
+		if pp, ok := params["per_page"]; ok {
+			if v, err := toInt(pp); err == nil && v > 0 {
+				perPage = v
+			}
+		}
+
+		commitsURL := fmt.Sprintf("%s/projects/%v/merge_requests/%v/commits?per_page=%d", baseURL, url.PathEscape(fmt.Sprintf("%v", projectID)), mrIID, perPage)
+		resp, err := g.makeRequest(client, "GET", commitsURL, token, nil)
+		if err != nil {
+			log.Printf("[GitLabConnector] check_mr_commit_author error fetching commits from %s: %v", commitsURL, err)
+			return nil, fmt.Errorf("failed to fetch MR commits: %w", err)
+		}
+
+		rawCommits, ok := resp.([]interface{})
+		if !ok {
+			log.Printf("[GitLabConnector] check_mr_commit_author unexpected response format")
+			return nil, fmt.Errorf("unexpected response format from gitlab MR commits endpoint")
+		}
+
+		parsedCommits, authors, authorEmails, committers, committerEmails := parseGitLabCommits(rawCommits)
+
+		log.Printf("[GitLabConnector] project %v MR %v has %d total commit(s). Authors: %v | AuthorEmails: %v | Committers: %v",
+			projectID, mrIID, len(parsedCommits), authors, authorEmails, committers)
+
+		var matchedCommits []map[string]interface{}
+		var compiledRegex *regexp.Regexp
+		if messageRegex != "" {
+			var err error
+			compiledRegex, err = regexp.Compile(messageRegex)
+			if err != nil {
+				log.Printf("[GitLabConnector] invalid message_regex pattern %q: %v", messageRegex, err)
+				return nil, fmt.Errorf("invalid message_regex pattern: %w", err)
+			}
+		}
+
+		extractPrefix := func(s string) string {
+			if idx := strings.Index(s, "@"); idx > 0 {
+				return s[:idx]
+			}
+			return s
+		}
+
+		for idx, commit := range parsedCommits {
+			isAuthorMatch := false
+			matchReason := ""
+
+			cAuthorName := fmt.Sprintf("%v", commit["author_name"])
+			cAuthorEmail := fmt.Sprintf("%v", commit["author_email"])
+			cCommitterName := fmt.Sprintf("%v", commit["committer_name"])
+			cCommitterEmail := fmt.Sprintf("%v", commit["committer_email"])
+			cID := fmt.Sprintf("%v", commit["short_id"])
+			cTitle := fmt.Sprintf("%v", commit["title"])
+
+			if targetEmail != "" && (strings.EqualFold(cAuthorEmail, targetEmail) || strings.EqualFold(cCommitterEmail, targetEmail)) {
+				isAuthorMatch = true
+				matchReason = fmt.Sprintf("exact email match (%s)", targetEmail)
+			} else if targetAuthorName != "" && (strings.EqualFold(cAuthorName, targetAuthorName) || strings.EqualFold(cCommitterName, targetAuthorName)) {
+				isAuthorMatch = true
+				matchReason = fmt.Sprintf("exact author name match (%s)", targetAuthorName)
+			} else if targetCommitterEmail != "" && strings.EqualFold(cCommitterEmail, targetCommitterEmail) {
+				isAuthorMatch = true
+				matchReason = fmt.Sprintf("exact committer email match (%s)", targetCommitterEmail)
+			} else if targetUser != "" {
+				if strings.EqualFold(cAuthorEmail, targetUser) || strings.EqualFold(cCommitterEmail, targetUser) {
+					isAuthorMatch = true
+					matchReason = fmt.Sprintf("user matched email (%s)", targetUser)
+				} else if strings.EqualFold(cAuthorName, targetUser) || strings.EqualFold(cCommitterName, targetUser) {
+					isAuthorMatch = true
+					matchReason = fmt.Sprintf("user matched name (%s)", targetUser)
+				} else if strings.Contains(targetUser, "@") {
+					prefix := extractPrefix(targetUser)
+					if prefix != "" && (strings.Contains(strings.ToLower(cAuthorName), strings.ToLower(prefix)) ||
+						strings.Contains(strings.ToLower(cAuthorEmail), strings.ToLower(prefix)) ||
+						strings.Contains(strings.ToLower(cCommitterName), strings.ToLower(prefix))) {
+						isAuthorMatch = true
+						matchReason = fmt.Sprintf("email prefix match (%s)", prefix)
+					}
+				}
+			} else if targetEmail == "" && targetAuthorName == "" && targetCommitterEmail == "" && targetUser == "" {
+				// No author filter specified -> matches all commits (for message inspection)
+				isAuthorMatch = true
+				matchReason = "no author filter specified"
+			}
+
+			if !isAuthorMatch {
+				log.Printf("[GitLabConnector] commit #%d (%s) did not match author: author=%q <%s>, committer=%q <%s>",
+					idx+1, cID, cAuthorName, cAuthorEmail, cCommitterName, cCommitterEmail)
+				continue
+			}
+
+			msg := fmt.Sprintf("%v", commit["message"])
+			if messageContains != "" && !strings.Contains(strings.ToLower(msg), strings.ToLower(messageContains)) {
+				log.Printf("[GitLabConnector] commit #%d (%s) matched author (%s), but failed message_contains %q",
+					idx+1, cID, matchReason, messageContains)
+				continue
+			}
+
+			if compiledRegex != nil && !compiledRegex.MatchString(msg) {
+				log.Printf("[GitLabConnector] commit #%d (%s) matched author (%s), but failed message_regex %q",
+					idx+1, cID, matchReason, messageRegex)
+				continue
+			}
+
+			log.Printf("[GitLabConnector] -> MATCH SUCCESS on commit #%d (%s) by %s: author=%q <%s>, title=%q",
+				idx+1, cID, matchReason, cAuthorName, cAuthorEmail, cTitle)
+
+			matchedCommits = append(matchedCommits, commit)
+		}
+
+		isAuthor := len(matchedCommits) > 0
+		var latestCommit interface{}
+		if isAuthor {
+			latestCommit = matchedCommits[0]
+		}
+
+		log.Printf("[GitLabConnector] check_mr_commit_author completed: is_author=%t, match_count=%d, total_commits=%d",
+			isAuthor, len(matchedCommits), len(parsedCommits))
+
+		return map[string]interface{}{
+			"is_author":            isAuthor,
+			"found":                isAuthor,
+			"match_count":          len(matchedCommits),
+			"total_commits":        len(parsedCommits),
+			"matched_commits":      matchedCommits,
+			"latest_commit":        latestCommit,
+			"all_authors":          authors,
+			"all_author_emails":    authorEmails,
+			"all_committers":       committers,
+			"all_committer_emails": committerEmails,
+		}, nil
 	}
 
 	return nil, fmt.Errorf("unsupported gitlab action: %s", action)
+}
+
+func parseGitLabCommits(rawCommits []interface{}) ([]map[string]interface{}, []string, []string, []string, []string) {
+	var parsed []map[string]interface{}
+	authorMap := make(map[string]bool)
+	authorEmailMap := make(map[string]bool)
+	committerMap := make(map[string]bool)
+	committerEmailMap := make(map[string]bool)
+
+	var authors []string
+	var authorEmails []string
+	var committers []string
+	var committerEmails []string
+
+	for _, c := range rawCommits {
+		cMap, ok := c.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		id := fmt.Sprintf("%v", cMap["id"])
+		shortID := fmt.Sprintf("%v", cMap["short_id"])
+		title := fmt.Sprintf("%v", cMap["title"])
+		authorName := fmt.Sprintf("%v", cMap["author_name"])
+		authorEmail := fmt.Sprintf("%v", cMap["author_email"])
+		authoredDate := fmt.Sprintf("%v", cMap["authored_date"])
+		committerName := fmt.Sprintf("%v", cMap["committer_name"])
+		committerEmail := fmt.Sprintf("%v", cMap["committer_email"])
+		committedDate := fmt.Sprintf("%v", cMap["committed_date"])
+		message := fmt.Sprintf("%v", cMap["message"])
+
+		if authorName != "" && !authorMap[authorName] {
+			authorMap[authorName] = true
+			authors = append(authors, authorName)
+		}
+		if authorEmail != "" && !authorEmailMap[authorEmail] {
+			authorEmailMap[authorEmail] = true
+			authorEmails = append(authorEmails, authorEmail)
+		}
+		if committerName != "" && !committerMap[committerName] {
+			committerMap[committerName] = true
+			committers = append(committers, committerName)
+		}
+		if committerEmail != "" && !committerEmailMap[committerEmail] {
+			committerEmailMap[committerEmail] = true
+			committerEmails = append(committerEmails, committerEmail)
+		}
+
+		parsed = append(parsed, map[string]interface{}{
+			"id":               id,
+			"short_id":         shortID,
+			"title":            title,
+			"author_name":      authorName,
+			"author_email":     authorEmail,
+			"authored_date":    authoredDate,
+			"committer_name":   committerName,
+			"committer_email":  committerEmail,
+			"committed_date":   committedDate,
+			"message":          message,
+			"raw":              cMap,
+		})
+	}
+
+	return parsed, authors, authorEmails, committers, committerEmails
 }
 
 func toInt(v interface{}) (int, error) {

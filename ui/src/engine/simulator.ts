@@ -130,6 +130,83 @@ export function executeMockAction(
           return { output: { status: 'closed' } };
         case 'add_mr_note':
           return { output: { id: 501, body: resolvedParams.body } };
+        case 'get_mr_commits':
+          return {
+            output: {
+              total: 2,
+              commits: [
+                {
+                  id: 'c111111111111111111111111111111111111111',
+                  short_id: 'c1111111',
+                  title: 'feat: add oauth service account authentication',
+                  author_name: 'Alice Developer',
+                  author_email: 'alice@company.com',
+                },
+                {
+                  id: 'c222222222222222222222222222222222222222',
+                  short_id: 'c2222222',
+                  title: 'fix: resolve race condition in dag runner',
+                  author_name: 'Bob Contributor',
+                  author_email: 'bob@company.com',
+                },
+              ],
+              all_authors: ['Alice Developer', 'Bob Contributor'],
+              all_author_emails: ['alice@company.com', 'bob@company.com'],
+              all_committers: ['Alice Developer', 'Bob Contributor'],
+              all_committer_emails: ['alice@company.com', 'bob@company.com'],
+            },
+          };
+        case 'check_mr_commit_author': {
+          const target = String(resolvedParams.user || resolvedParams.email || resolvedParams.author_name || resolvedParams.committer_email || '').toLowerCase();
+          const mockCommits = [
+            {
+              id: 'c111111111111111111111111111111111111111',
+              short_id: 'c1111111',
+              title: 'feat: add oauth service account authentication',
+              author_name: 'Alice Developer',
+              author_email: 'alice@company.com',
+              committer_name: 'Alice Developer',
+              committer_email: 'alice@company.com',
+            },
+            {
+              id: 'c222222222222222222222222222222222222222',
+              short_id: 'c2222222',
+              title: 'fix: resolve race condition in dag runner',
+              author_name: 'Bob Contributor',
+              author_email: 'bob@company.com',
+              committer_name: 'Bob Contributor',
+              committer_email: 'bob@company.com',
+            },
+          ];
+
+          const matched = mockCommits.filter((c) => {
+            if (!target) return true;
+            return (
+              c.author_email.toLowerCase() === target ||
+              c.author_name.toLowerCase() === target ||
+              c.committer_email.toLowerCase() === target ||
+              c.committer_name.toLowerCase() === target ||
+              c.author_email.toLowerCase().includes(target) ||
+              c.author_name.toLowerCase().includes(target)
+            );
+          });
+
+          const isAuthor = matched.length > 0;
+          return {
+            output: {
+              is_author: isAuthor,
+              found: isAuthor,
+              match_count: matched.length,
+              total_commits: mockCommits.length,
+              matched_commits: matched,
+              latest_commit: matched[0] || null,
+              all_authors: ['Alice Developer', 'Bob Contributor'],
+              all_author_emails: ['alice@company.com', 'bob@company.com'],
+              all_committers: ['Alice Developer', 'Bob Contributor'],
+              all_committer_emails: ['alice@company.com', 'bob@company.com'],
+            },
+          };
+        }
       }
       break;
     }

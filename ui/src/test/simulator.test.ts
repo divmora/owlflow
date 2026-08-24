@@ -267,6 +267,79 @@ describe('DryRunSimulationEngine', () => {
     expect(negResult.bypassedEdgeIds).toContain('verify_comment->on_commented');
   });
 
+  it('executes gitlab.check_mr_commit_author and branches conditionally', () => {
+    // 1. Mock action execution check
+    const checkAlice = executeMockAction('gitlab.check_mr_commit_author', {
+      project_id: 'group/repo',
+      merge_request_iid: 10,
+      user: 'alice@company.com',
+    });
+    expect(checkAlice.output.is_author).toBe(true);
+    expect(checkAlice.output.found).toBe(true);
+
+    const checkUnknown = executeMockAction('gitlab.check_mr_commit_author', {
+      project_id: 'group/repo',
+      merge_request_iid: 10,
+      user: 'unknown@company.com',
+    });
+    expect(checkUnknown.output.is_author).toBe(false);
+    expect(checkUnknown.output.found).toBe(false);
+
+    // 2. Workflow dry-run simulation branching
+    const gitlabCommitWorkflow: Workflow = {
+      id: 'gitlab-commit-author-check',
+      name: 'GitLab Commit Author Check',
+      status: 'active',
+      trigger: {
+        type: 'webhook',
+        config: { initial_step: 'verify_author' },
+      },
+      steps: [
+        {
+          id: 'verify_author',
+          action: 'gitlab.check_mr_commit_author',
+          params: {
+            project_id: '123',
+            merge_request_iid: '42',
+            user: 'alice@company.com',
+          },
+          next_steps: [
+            {
+              step_id: 'on_author_found',
+              condition: '{{ .steps.verify_author.output.is_author }} == true',
+            },
+            {
+              step_id: 'on_author_missing',
+              condition: '{{ .steps.verify_author.output.is_author }} == false',
+            },
+          ],
+        },
+        {
+          id: 'on_author_found',
+          action: 'logger.info',
+          params: { message: 'Author confirmed in MR commits' },
+        },
+        {
+          id: 'on_author_missing',
+          action: 'logger.warn',
+          params: { message: 'Required user is not a commit author' },
+        },
+      ],
+    };
+
+    const res = engine.simulate({
+      workflow: gitlabCommitWorkflow,
+      triggerInput: { payload: {} },
+    });
+
+    expect(res.status).toBe('completed');
+    expect(res.executedStepIds).toContain('verify_author');
+    expect(res.executedStepIds).toContain('on_author_found');
+    expect(res.bypassedStepIds).toContain('on_author_missing');
+    expect(res.activeEdgeIds).toContain('verify_author->on_author_found');
+    expect(res.bypassedEdgeIds).toContain('verify_author->on_author_missing');
+  });
+
   it('guards against infinite loops in cyclic workflows via maxExecutionSteps limit', () => {
     const cyclicWorkflow: Workflow = {
       id: 'loop-wf',

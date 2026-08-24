@@ -115,6 +115,79 @@ Looks up a GitLab user by username.
 
 ---
 
+### `gitlab.check_mr_commit_author`
+Checks whether a specific user is the author or committer of any commit in a GitLab Merge Request, with optional commit message filtering.
+
+**Parameters:**
+- `project_id` (`int` / `string`, required): GitLab project ID or URL-encoded path.
+- `merge_request_iid` (`int` / `string`, required): Internal IID of the Merge Request.
+- `user` / `target_user` (`string`, optional): Target user (checked against author email, committer email, author name, or username prefix).
+- `email` / `author_email` (`string`, optional): Specific author or committer email address.
+- `author_name` (`string`, optional): Specific author display name.
+- `committer_email` (`string`, optional): Specific committer email address.
+- `message_contains` (`string`, optional): Substring to match within commit messages.
+- `message_regex` (`string`, optional): Regular expression pattern for commit messages.
+- `per_page` (`int`, optional): Number of commits to fetch (default: 100).
+- `token` (`string`, optional): GitLab Personal Access Token.
+- `base_url` (`string`, optional): GitLab API base URL.
+
+**Output:**
+```json
+{
+  "is_author": true,
+  "found": true,
+  "match_count": 1,
+  "total_commits": 3,
+  "matched_commits": [
+    {
+      "id": "ed899a8ee502938a1c0964b63678b46407a367ea",
+      "short_id": "ed899a8e",
+      "title": "feat: add oauth service account",
+      "author_name": "Alice Developer",
+      "author_email": "alice@company.com",
+      "committer_name": "Alice Developer",
+      "committer_email": "alice@company.com",
+      "authored_date": "2026-08-24T10:00:00.000Z",
+      "message": "feat: add oauth service account"
+    }
+  ],
+  "latest_commit": {
+    "id": "ed899a8ee502938a1c0964b63678b46407a367ea",
+    "short_id": "ed899a8e",
+    "title": "feat: add oauth service account",
+    "author_name": "Alice Developer"
+  },
+  "all_authors": ["Alice Developer", "Bob Contributor"],
+  "all_author_emails": ["alice@company.com", "bob@company.com"],
+  "all_committers": ["Alice Developer"],
+  "all_committer_emails": ["alice@company.com"]
+}
+```
+
+---
+
+### `gitlab.get_mr_commits`
+Fetches all commits and parsed author/committer metadata for a Merge Request.
+
+**Parameters:**
+- `project_id` (`int` / `string`, required): GitLab project ID or URL-encoded path.
+- `merge_request_iid` (`int` / `string`, required): Internal IID of the Merge Request.
+- `per_page` (`int`, optional): Max commits to retrieve (default: 100).
+
+**Output:**
+```json
+{
+  "total": 2,
+  "commits": [ ... ],
+  "all_authors": ["Alice Developer", "Bob Contributor"],
+  "all_author_emails": ["alice@company.com", "bob@company.com"],
+  "all_committers": ["Alice Developer"],
+  "all_committer_emails": ["alice@company.com"]
+}
+```
+
+---
+
 ## 3. Jira Connector (`jira`)
 
 Integrates with the Atlassian Jira Cloud REST API (v3). Authentication uses `JIRA_USER` (email) and `JIRA_TOKEN` (API token).
