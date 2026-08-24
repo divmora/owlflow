@@ -6,6 +6,8 @@ import (
 	"log"
 	"strings"
 	"time"
+
+	"github.com/divmora/owlflow/internal/logging"
 )
 
 type LoggerConnector struct {
@@ -72,6 +74,11 @@ func (l *LoggerConnector) Execute(action string, params map[string]interface{}) 
 	}
 
 	log.Println(string(jsonData))
+
+	if explicitSyslog, ok := params["syslog"].(bool); ok && explicitSyslog && !logging.IsSyslogEnabled() {
+		_ = logging.SendToSyslog(string(jsonData))
+	}
+
 	return nil, nil
 }
 

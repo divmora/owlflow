@@ -15,6 +15,7 @@ import (
 
 	"github.com/divmora/owlflow/internal/connectors"
 	"github.com/divmora/owlflow/internal/core"
+	"github.com/divmora/owlflow/internal/logging"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -31,6 +32,7 @@ type API struct {
 }
 
 func NewAPI() *API {
+	logging.Init()
 	return &API{
 		Workflows:  make(map[string]*core.Workflow),
 		Connectors: connectors.Registry,
@@ -38,6 +40,11 @@ func NewAPI() *API {
 }
 
 func (a *API) SetupRouter() *gin.Engine {
+	logging.Init()
+	if logging.IsSyslogEnabled() {
+		gin.DefaultWriter = log.Writer()
+		gin.DefaultErrorWriter = log.Writer()
+	}
 	r := gin.Default()
 
 	//r.POST("/workflows/:id/execute", a.executeWorkflow)

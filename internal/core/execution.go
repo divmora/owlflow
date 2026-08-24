@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/divmora/owlflow/internal/connectors"
+	"github.com/divmora/owlflow/internal/logging"
 )
 
 type ExecutionContext struct {
@@ -32,6 +33,7 @@ type Executor struct {
 }
 
 func NewExecutor(wf *Workflow, connectors map[string]connectors.Connector) *Executor {
+	logging.Init()
 	return &Executor{
 		Workflow:   wf,
 		Connectors: connectors,
@@ -43,6 +45,7 @@ func NewExecutor(wf *Workflow, connectors map[string]connectors.Connector) *Exec
 }
 
 func (e *Executor) Run(ctx context.Context, initialData ExecutionContext) error {
+	logging.Init()
 	// Initialize with root execution
 	execStates := []*ExecutionState{
 		{
