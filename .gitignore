@@ -3,6 +3,7 @@ owlflow
 main
 bin/
 dist/
+dist-docs/
 *.exe
 *.exe~
 *.dll
