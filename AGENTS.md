@@ -76,8 +76,11 @@ pnpm dev
 # Run Vitest test suites
 pnpm test
 
-# Build production bundle
+# Build production bundle (Studio)
 pnpm build
+
+# Build full unified GitHub Pages site (Studio + Docs + AI manifests)
+pnpm build:pages
 ```
 
 ### Multi-Service (Docker Compose)

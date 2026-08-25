@@ -134,11 +134,33 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           onClick={onOpenHelp}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-sky-400 hover:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 transition shadow-sm"
-          title="Open Component & Syntax Guide"
+          title="Open In-App Component & Syntax Guide"
         >
           <BookOpen className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Docs &amp; Guide</span>
         </button>
+
+        <a
+          href="./docs/index.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-750 border border-slate-700/80 transition"
+          title="Open Full Documentation Portal in New Tab"
+        >
+          <BookOpen className="h-3.5 w-3.5 text-indigo-400" />
+          <span>Full Docs ↗</span>
+        </a>
+
+        <a
+          href="./llms.txt"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-purple-400 hover:text-purple-300 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 transition"
+          title="View AI / LLM Sitemap Manifest"
+        >
+          <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+          <span>llms.txt</span>
+        </a>
       </div>
 
       {/* Right: Layout Toggle, Validation Status & Simulate Button */}

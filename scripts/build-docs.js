@@ -16,16 +16,21 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
-const outDir = path.resolve(rootDir, 'dist-docs');
+// Output directory defaults to dist-docs or can be specified via command line (e.g. `ui/dist`)
+const targetArg = process.argv[2];
+const outDir = targetArg ? path.resolve(process.cwd(), targetArg) : path.resolve(rootDir, 'dist-docs');
+const docsDir = path.join(outDir, 'docs');
+const docsWorkflowsDir = path.join(docsDir, 'workflows');
+const rootWorkflowsDir = path.join(outDir, 'workflows');
 
-// Create output directories
-fs.rmSync(outDir, { recursive: true, force: true });
+// Ensure output directories exist
 fs.mkdirSync(outDir, { recursive: true });
-fs.mkdirSync(path.join(outDir, 'docs'), { recursive: true });
-fs.mkdirSync(path.join(outDir, 'workflows'), { recursive: true });
+fs.mkdirSync(docsDir, { recursive: true });
+fs.mkdirSync(docsWorkflowsDir, { recursive: true });
+fs.mkdirSync(rootWorkflowsDir, { recursive: true });
 
 const docPages = [
-  { file: 'README.md', slug: 'index', title: 'Home / README', section: 'Getting Started' },
+  { file: 'README.md', slug: 'index', title: 'Home / Overview', section: 'Getting Started' },
   { file: 'AGENTS.md', slug: 'agents', title: 'AI Agent Guidelines', section: 'AI & Developer Guides' },
   { file: 'docs/overview.md', slug: 'overview', title: 'Engine Architecture & DAG', section: 'Architecture' },
   { file: 'docs/getting-started.md', slug: 'getting-started', title: 'Quickstart & Installation', section: 'Getting Started' },
@@ -159,22 +164,26 @@ function buildHtmlPage(page, contentHtml, rawMdName) {
   <header class="sticky top-0 z-40 w-full border-b border-slate-800 bg-slate-950/90 backdrop-blur">
     <div class="max-w-7xl mx-auto flex h-14 items-center justify-between px-4 sm:px-6">
       <div class="flex items-center gap-3">
-        <a href="index.html" class="flex items-center gap-2 font-bold text-lg text-white">
+        <a href="index.html" class="flex items-center gap-2 font-bold text-lg text-white hover:opacity-90 transition-opacity">
           <span class="p-1 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">🦉</span>
-          <span>OwlFlow <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono font-normal">v1.0.0</span></span>
+          <span>OwlFlow <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono font-normal">Docs</span></span>
         </a>
       </div>
-      <div class="flex items-center gap-3 text-sm">
-        <a href="llms.txt" class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30 hover:bg-purple-500/20 transition-all font-mono text-xs font-semibold">
+      <div class="flex items-center gap-2.5 sm:gap-3 text-sm">
+        <a href="../" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold transition-all text-xs shadow-md shadow-sky-500/20">
+          <span>⚡</span>
+          <span>Launch Studio</span>
+        </a>
+        <a href="../llms.txt" class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30 hover:bg-purple-500/20 transition-all font-mono text-xs font-semibold">
           <span>🤖</span>
           <span>llms.txt</span>
         </a>
-        <a href="llms-full.txt" class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all font-mono text-xs font-semibold">
+        <a href="../llms-full.txt" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 transition-all font-mono text-xs font-semibold">
           <span>📄</span>
-          <span>llms-full.txt (All Docs)</span>
+          <span>llms-full.txt</span>
         </a>
-        <a href="${rawMdName}" class="hidden sm:inline-block text-xs text-slate-400 hover:text-sky-400 font-mono transition-colors">
-          View Raw Markdown
+        <a href="${rawMdName}" class="hidden lg:inline-block text-xs text-slate-400 hover:text-sky-400 font-mono transition-colors">
+          Raw Markdown
         </a>
         <a href="https://github.com/divmora/owlflow" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-white transition-colors">
           GitHub ↗
@@ -198,7 +207,7 @@ function buildHtmlPage(page, contentHtml, rawMdName) {
           <div class="font-bold text-white flex items-center gap-1.5">
             <span>🤖</span> AI Scraper Ready
           </div>
-          <p>This site provides <a href="llms.txt" class="text-sky-400 underline">llms.txt</a> and <a href="llms-full.txt" class="text-sky-400 underline">llms-full.txt</a> for automated LLM ingestion.</p>
+          <p>This site provides <a href="../llms.txt" class="text-sky-400 underline">llms.txt</a> and <a href="../llms-full.txt" class="text-sky-400 underline">llms-full.txt</a> for automated LLM ingestion.</p>
         </div>
       </div>
     </aside>
@@ -232,18 +241,18 @@ for (const page of docPages) {
   const rawMd = fs.readFileSync(filePath, 'utf8');
   allDocsTextParts.push(`\n================================================================================\n# DOCUMENT: ${page.file} (${page.title})\n================================================================================\n\n${rawMd}\n`);
 
-  // Write raw markdown mirror for direct scraping
+  // Write raw markdown mirror for direct scraping inside docs/
   const rawFileName = page.slug === 'index' ? 'README.md' : `${page.slug}.md`;
-  fs.writeFileSync(path.join(outDir, rawFileName), rawMd, 'utf8');
+  fs.writeFileSync(path.join(docsDir, rawFileName), rawMd, 'utf8');
 
-  // Render HTML
+  // Render HTML inside docs/
   const renderedHtml = renderMarkdown(rawMd);
   const fullHtml = buildHtmlPage(page, renderedHtml, rawFileName);
-  const outHtmlPath = path.join(outDir, page.slug === 'index' ? 'index.html' : `${page.slug}.html`);
+  const outHtmlPath = path.join(docsDir, page.slug === 'index' ? 'index.html' : `${page.slug}.html`);
   fs.writeFileSync(outHtmlPath, fullHtml, 'utf8');
 }
 
-// Copy sample workflows into dist-docs/workflows
+// Copy sample workflows into docs/workflows and workflows/
 const workflowsDir = path.join(rootDir, 'configs', 'workflows');
 if (fs.existsSync(workflowsDir)) {
   const wfFiles = fs.readdirSync(workflowsDir);
@@ -251,13 +260,14 @@ if (fs.existsSync(workflowsDir)) {
     if (wf.endsWith('.yaml') || wf.endsWith('.json') || wf.endsWith('.yml')) {
       const srcPath = path.join(workflowsDir, wf);
       const content = fs.readFileSync(srcPath, 'utf8');
-      fs.writeFileSync(path.join(outDir, 'workflows', wf), content, 'utf8');
+      fs.writeFileSync(path.join(docsWorkflowsDir, wf), content, 'utf8');
+      fs.writeFileSync(path.join(rootWorkflowsDir, wf), content, 'utf8');
       allDocsTextParts.push(`\n================================================================================\n# SAMPLE WORKFLOW: configs/workflows/${wf}\n================================================================================\n\n${content}\n`);
     }
   }
 }
 
-// 2. Generate llms-full.txt
+// 2. Generate llms-full.txt at root of outDir
 const llmsFullHeader = `# OwlFlow Complete Technical Documentation & Reference Manifest
 # Generated for AI Assistants, LLMs, and Automated Scrapers
 # Repository: https://github.com/divmora/owlflow
@@ -270,7 +280,7 @@ const llmsFullHeader = `# OwlFlow Complete Technical Documentation & Reference M
 const fullTextContent = llmsFullHeader + '\n' + allDocsTextParts.join('\n');
 fs.writeFileSync(path.join(outDir, 'llms-full.txt'), fullTextContent, 'utf8');
 
-// 3. Generate llms.txt (Standard AI Sitemap Manifest)
+// 3. Generate llms.txt at root of outDir (Standard AI Sitemap Manifest)
 const llmsTxtContent = `# OwlFlow Documentation for LLMs & AI Coding Agents
 
 > OwlFlow is a lightweight, high-performance declarative workflow automation engine written in Go, accompanied by a developer UI in React, Vite, and Tailwind CSS.
@@ -279,26 +289,26 @@ const llmsTxtContent = `# OwlFlow Documentation for LLMs & AI Coding Agents
 - [llms-full.txt](llms-full.txt): Complete, all-in-one consolidated markdown documentation for instant ingestion.
 
 ## Documentation Sections
-- [Home / README](README.md): Project overview, feature summary, quick development commands.
-- [AI Agent Guidelines (AGENTS.md)](agents.md): Agent working conventions, testing commands, architecture overview.
-- [Architecture & Engine Overview](overview.md): DAG execution engine, breadth-first traversal, context isolation, AWS Lambda mode.
-- [Connectors Reference](connectors.md): Complete reference for Jira (check_user_comment, get_comments, transition_issue, search_issues), GitLab, HTTP, Logger, and Internal connectors.
-- [Templating & Condition Engine](templating-and-conditions.md): Go template syntax, built-in helpers (toJson, first, index), boolean conditions, regexMatch, and hasPrefix.
-- [Workflow Configuration Schema](configuration.md): Complete YAML/JSON schema, Webhook HMAC-SHA256 signature verification, 6-field Cron syntax.
-- [Getting Started & Local Setup](getting-started.md): Installation, running Go backend (:8080) and Developer UI (:5173).
-- [Production Deployment](deployment.md): Multi-stage Docker containerization, AWS Lambda Web Adapter deployment.
-- [Developer UI & Simulator](ui.md): ReactFlow DAG visualizer, YAML editor, Vitest testing suites.
+- [Home / README](docs/README.md): Project overview, feature summary, quick development commands.
+- [AI Agent Guidelines (AGENTS.md)](docs/agents.md): Agent working conventions, testing commands, architecture overview.
+- [Architecture & Engine Overview](docs/overview.md): DAG execution engine, breadth-first traversal, context isolation, AWS Lambda mode.
+- [Connectors Reference](docs/connectors.md): Complete reference for Jira (check_user_comment, get_comments, transition_issue, search_issues), GitLab, HTTP, Logger, and Internal connectors.
+- [Templating & Condition Engine](docs/templating-and-conditions.md): Go template syntax, built-in helpers (toJson, first, index), boolean conditions, regexMatch, and hasPrefix.
+- [Workflow Configuration Schema](docs/configuration.md): Complete YAML/JSON schema, Webhook HMAC-SHA256 signature verification, 6-field Cron syntax.
+- [Getting Started & Local Setup](docs/getting-started.md): Installation, running Go backend (:8080) and Developer UI (:5173).
+- [Production Deployment](docs/deployment.md): Multi-stage Docker containerization, AWS Lambda Web Adapter deployment.
+- [Developer UI & Simulator](docs/ui.md): ReactFlow DAG visualizer, YAML editor, Vitest testing suites.
 
 ## Sample Workflows
-- [jira-comment-check.yaml](workflows/jira-comment-check.yaml): Jira user comment verification and conditional 2-way branching.
-- [gitlab-monitor.yaml](workflows/gitlab-monitor.yaml): GitLab webhook event handling and project metadata retrieval.
-- [github-monitor.yaml](workflows/github-monitor.yaml): GitHub commit verification with Slack alert notification.
-- [schedule_test.yaml](workflows/schedule_test.yaml): 6-field sub-minute Cron workflow execution.
+- [jira-comment-check.yaml](docs/workflows/jira-comment-check.yaml): Jira user comment verification and conditional 2-way branching.
+- [gitlab-monitor.yaml](docs/workflows/gitlab-monitor.yaml): GitLab webhook event handling and project metadata retrieval.
+- [github-monitor.yaml](docs/workflows/github-monitor.yaml): GitHub commit verification with Slack alert notification.
+- [schedule_test.yaml](docs/workflows/schedule_test.yaml): 6-field sub-minute Cron workflow execution.
 `;
 
 fs.writeFileSync(path.join(outDir, 'llms.txt'), llmsTxtContent, 'utf8');
 
-// 4. Generate robots.txt
+// 4. Generate robots.txt at root of outDir
 const robotsTxt = `User-agent: *
 Allow: /
 
@@ -306,7 +316,6 @@ Sitemap: https://divmora.github.io/owlflow/sitemap.xml
 `;
 fs.writeFileSync(path.join(outDir, 'robots.txt'), robotsTxt, 'utf8');
 
-console.log('✅ Successfully built OwlFlow Documentation & AI Portal in dist-docs/');
-console.log('   - Static HTML Pages:', docPages.length);
-console.log('   - llms.txt & llms-full.txt generated');
-console.log('   - Raw Markdown mirrors generated');
+console.log(`✅ Successfully built OwlFlow Documentation & AI Portal in ${path.relative(rootDir, outDir) || '.'}/`);
+console.log(`   - Documentation Pages: ${path.join(path.relative(rootDir, docsDir) || 'docs')}`);
+console.log('   - Root Manifests: llms.txt, llms-full.txt, robots.txt');

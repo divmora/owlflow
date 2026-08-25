@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "tsc && vite build",
-    "build:docs": "node ../scripts/build-docs.js",
+    "build:docs": "node ../scripts/build-docs.js dist",
+    "build:pages": "tsc && vite build && node ../scripts/build-docs.js dist",
     "preview": "vite preview --host 0.0.0.0 --port 5173",
     "test": "vitest run",
     "test:watch": "vitest"

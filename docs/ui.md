@@ -3,7 +3,9 @@
 OwlFlow includes an interactive, standalone developer web UI located in [`ui/`](../ui/) built with **React**, **Vite**, **Tailwind CSS**, and **React Flow**.
 
 - 🌐 **Live Web Playground**: [https://divmora.github.io/owlflow/](https://divmora.github.io/owlflow/)
-- 🚀 **Automated Deployment**: Built and deployed automatically to GitHub Pages via GitHub Actions on every merge to `main` and version release tag.
+- 📖 **Live Documentation Portal**: [https://divmora.github.io/owlflow/docs/](https://divmora.github.io/owlflow/docs/)
+- 🤖 **AI & LLM Manifests**: [https://divmora.github.io/owlflow/llms.txt](https://divmora.github.io/owlflow/llms.txt) & [llms-full.txt](https://divmora.github.io/owlflow/llms-full.txt)
+- 🚀 **Automated Deployment**: Built and deployed as a single unified artifact to GitHub Pages via GitHub Actions on every merge to `main` and version release tag.
 
 ---
 
@@ -65,8 +67,9 @@ docker compose up --build
 ### Running Tests & Building
 ```bash
 cd ui
-pnpm test     # Run all Vitest suites
-pnpm build    # Production build
+pnpm test          # Run all Vitest suites
+pnpm build         # Production build (Studio app)
+pnpm build:pages   # Unified GitHub Pages build (Studio + Docs + AI manifests)
 ```
 
 ---
