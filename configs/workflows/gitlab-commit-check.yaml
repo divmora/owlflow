@@ -1,0 +1,42 @@
+id: "gitlab-commit-author-verification"
+name: "GitLab Merge Request Commit Author Check"
+status: "active"
+vars:
+  required_author_email: "lead-dev@company.com"
+
+trigger:
+  type: "webhook"
+  config:
+    path: "/gitlab-mr-hook"
+    initial_step: "check_commit_author"
+
+steps:
+  - id: "check_commit_author"
+    action: "gitlab.check_mr_commit_author"
+    params:
+      project_id: "{{ .trigger.payload.project.id }}"
+      merge_request_iid: "{{ .trigger.payload.object_attributes.iid }}"
+      email: "{{ .vars.required_author_email }}"
+    next_steps:
+      - step_id: "auto_approve_mr"
+        condition: '{{ .steps.check_commit_author.output.is_author }} == true'
+      - step_id: "request_author_review"
+        condition: '{{ .steps.check_commit_author.output.is_author }} == false'
+
+  - id: "auto_approve_mr"
+    action: "gitlab.approve_mr"
+    params:
+      project_id: "{{ .trigger.payload.project.id }}"
+      merge_request_iid: "{{ .trigger.payload.object_attributes.iid }}"
+    next_steps:
+      - step_id: "log_approved"
+
+  - id: "log_approved"
+    action: "logger.info"
+    params:
+      message: "MR !{{ .trigger.payload.object_attributes.iid }} approved because {{ .vars.required_author_email }} is an author on {{ .steps.check_commit_author.output.match_count }} commit(s)."
+
+  - id: "request_author_review"
+    action: "logger.warn"
+    params:
+      message: "MR !{{ .trigger.payload.object_attributes.iid }} does not contain commits from {{ .vars.required_author_email }}. Authors found: {{ .steps.check_commit_author.output.all_authors }}"

@@ -1,0 +1,43 @@
+id: "jira-user-comment-check"
+name: "Jira Task User Comment Verification"
+status: "active"
+vars:
+  target_issue: "PROJ-101"
+  approver_email: "qa-lead@company.com"
+
+trigger:
+  type: "manual"
+  config:
+    initial_step: "verify_qa_comment"
+
+steps:
+  - id: "verify_qa_comment"
+    action: "jira.check_user_comment"
+    params:
+      issue_key: "{{ .vars.target_issue }}"
+      user: "{{ .vars.approver_email }}"
+    next_steps:
+      - step_id: "transition_to_done"
+        condition: '{{ .steps.verify_qa_comment.output.commented }} == true'
+      - step_id: "notify_pending_qa"
+        condition: '{{ .steps.verify_qa_comment.output.commented }} == false'
+
+  - id: "transition_to_done"
+    action: "jira.transition_issue"
+    params:
+      issue_key: "{{ .vars.target_issue }}"
+      transition_id: "31" # e.g. "Done"
+    next_steps:
+      - step_id: "log_success"
+
+  - id: "log_success"
+    action: "logger.info"
+    params:
+      message: "Ticket {{ .vars.target_issue }} transitioned after comment from {{ .vars.approver_email }}"
+
+  - id: "notify_pending_qa"
+    action: "logger.warn"
+    params:
+      message: "Awaiting QA sign-off comment from {{ .vars.approver_email }} on {{ .vars.target_issue }}. Total comments so far: {{ .steps.verify_qa_comment.output.total_comments }}"
+      fields:
+        existing_authors: "{{ .steps.verify_qa_comment.output.all_authors }}"

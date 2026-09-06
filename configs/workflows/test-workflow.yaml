@@ -1,0 +1,40 @@
+id: "test-workflow"
+name: "Test workflow"
+status: "disabled"
+trigger:
+  type: "webhook"
+  config:
+    path: "/test-workflow"
+    initial_step: "log_event"
+steps:
+  - id: "http_post"
+    action: "http.post"
+    params:
+      url: "https://api.example.com/webhook"
+      headers:
+        Content-Type: "application/json"
+        Authorization: "Bearer {{ index .TriggerData.headers \"User-Agent\" | first }}"
+      body: |
+        {
+          "event_type": "{{ .TriggerData.payload.data }}",
+          "received_at": "{{ .TriggerData.payload.timestamp }}",
+          "data": {{ toJson .TriggerData.payload }}
+        }
+    retries: 2
+    pass_output: false
+
+  - id: "log_event"
+    action: "logger.info"
+    params:
+      message: |
+        Webhook Received
+        -----------------
+        Event: {{ .TriggerData.payload.event }}
+        {{ if (index .TriggerData.headers "X-Forwarded-For") }}
+        IP: {{ index .TriggerData.headers "X-Forwarded-For" }}
+        {{ else }}
+        IP: Unknown
+        {{ end }}
+        User Agent: {{ index .TriggerData.headers "User-Agent" }}
+        Payload: {{ toJson .TriggerData.payload }}
+    pass_output: false

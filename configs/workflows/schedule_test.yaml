@@ -1,0 +1,14 @@
+id: "schedule-test"
+name: "Schedule Test"
+status: "disabled"
+trigger:
+  type: "schedule"
+  config:
+    cron: "*/5 * * * * *"
+    initial_step: "log_time"
+steps:
+  - id: "log_time"
+    action: "logger.info"
+    params:
+      message: "Scheduled workflow executed at {{ .TriggerData.time }}"
+    pass_output: false

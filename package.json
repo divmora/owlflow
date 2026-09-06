@@ -1,0 +1,9 @@
+{
+  "name": "owlflow",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.29.1",
+  "scripts": {
+    "build:pages": "pnpm --filter owlflow-ui build:pages"
+  }
+}
