@@ -42,7 +42,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
 # ==============================================================================
 # Final Runtime Stage (Standalone / Non-Lambda)
 # ==============================================================================
-FROM alpine:3.21 AS final
+FROM alpine:3.24 AS final
 
 # Install runtime dependencies (certificates, timezone data)
 RUN apk update && apk add --no-cache \
