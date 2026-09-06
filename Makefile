@@ -141,6 +141,28 @@ docker-build-multiarch: ## Build multi-architecture container images (linux/amd6
 	docker buildx build --platform linux/amd64,linux/arm64 -t $(DOCKER_IMAGE_LATEST) .
 
 # ==============================================================================
+# GoReleaser Release Targets
+# ==============================================================================
+
+.PHONY: release-check
+release-check: ## Validate .goreleaser.yaml configuration
+	@echo "==> Validating GoReleaser configuration"
+	@if command -v goreleaser >/dev/null 2>&1; then \
+		goreleaser check; \
+	else \
+		go run github.com/goreleaser/goreleaser/v2@latest check; \
+	fi
+
+.PHONY: release-snapshot
+release-snapshot: ## Build GoReleaser release snapshot locally
+	@echo "==> Building GoReleaser snapshot"
+	@if command -v goreleaser >/dev/null 2>&1; then \
+		goreleaser release --snapshot --clean; \
+	else \
+		go run github.com/goreleaser/goreleaser/v2@latest release --snapshot --clean; \
+	fi
+
+# ==============================================================================
 # Help
 # ==============================================================================
 
