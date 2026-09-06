@@ -1,0 +1,24 @@
+id: "github-monitor"
+name: "GitHub Repository Monitor"
+status: "disabled"
+trigger:
+  type: "webhook"
+  config:
+    path: "/github-webhook"
+    initial_step: "check_commit"
+steps:
+  - id: "check_commit"
+    action: "http.get"
+    params:
+      url: "https://api.github.com/repos/{{ .trigger.payload.repo }}/commits"
+    next_steps:
+      - step_id: "notify_slack"
+        condition: '{{ .steps.check_commit.output.status_code }} != 200'
+      - step_id: "log_success"
+        condition: '{{ .steps.check_commit.output.status_code }} == 200'
+
+  - id: "notify_slack"
+    action: "slack.sendMessage"
+    params:
+      channel: "#alerts"
+      text: "GitHub API Error: {{ .steps.check_commit.output.body }}"
