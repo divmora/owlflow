@@ -108,19 +108,19 @@ docker compose up --build
 OwlFlow natively supports **AWS Lambda** using the [AWS Lambda Web Adapter](https://github.com/awslabs/aws-lambda-web-adapter).
 
 ### How it Works:
-1. The included `Dockerfile` copies the AWS Lambda Adapter binary to `/opt/extensions/lambda-adapter`.
+1. The dedicated `Dockerfile.lambda` copies the AWS Lambda Adapter binary to `/opt/extensions/lambda-adapter`.
 2. When deployed to Lambda as a Container Image, the adapter intercepts API Gateway / Function URL invocations, converts them into standard HTTP requests on `PORT 8080`, and proxies the responses back.
 3. OwlFlow automatically detects `AWS_LAMBDA_FUNCTION_NAME` and switches from asynchronous execution to synchronous execution so the Lambda container does not freeze prematurely before background goroutines finish.
 
 ### Deploy to AWS Lambda:
-1. Build and tag the Docker image:
+1. Build and tag the Lambda Docker image:
    ```bash
-   docker build -t <your-account-id>.dkr.ecr.<region>.amazonaws.com/owlflow:latest .
+   docker build -f Dockerfile.lambda -t <your-account-id>.dkr.ecr.<region>.amazonaws.com/owlflow-lambda:latest .
    ```
 2. Authenticate and push to Amazon ECR:
    ```bash
    aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin <your-account-id>.dkr.ecr.<region>.amazonaws.com
-   docker push <your-account-id>.dkr.ecr.<region>.amazonaws.com/owlflow:latest
+   docker push <your-account-id>.dkr.ecr.<region>.amazonaws.com/owlflow-lambda:latest
    ```
 3. Create a Lambda Function with package type **Image**.
 4. Configure Function URL or API Gateway HTTP API.

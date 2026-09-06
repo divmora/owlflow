@@ -87,6 +87,7 @@ make lint
 | `make ui-build` | Compile Vite UI production bundle |
 | `make ui-pages` | Build unified GitHub Pages documentation and Studio bundle |
 | `make docker-build` | Build local Docker container image |
+| `make docker-build-lambda` | Build AWS Lambda container image (with AWS Lambda Web Adapter) |
 | `make docker-build-multiarch` | Build multi-architecture Docker container image |
 
 ---

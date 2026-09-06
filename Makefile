@@ -32,6 +32,8 @@ LDFLAGS := -s -w \
 DOCKER_REGISTRY      ?= ghcr.io/divmora
 DOCKER_IMAGE         ?= $(DOCKER_REGISTRY)/$(BIN_NAME):$(VERSION)
 DOCKER_IMAGE_LATEST  ?= $(DOCKER_REGISTRY)/$(BIN_NAME):latest
+DOCKER_LAMBDA_IMAGE  ?= $(DOCKER_REGISTRY)/$(BIN_NAME)-lambda:$(VERSION)
+DOCKER_LAMBDA_LATEST ?= $(DOCKER_REGISTRY)/$(BIN_NAME)-lambda:latest
 
 # ==============================================================================
 # Top-Level Targets
@@ -127,6 +129,11 @@ ui-pages: ## Build unified GitHub Pages bundle (Studio + Docs + AI manifests)
 docker-build: ## Build local Docker container image
 	@echo "==> Building Docker image $(DOCKER_IMAGE_LATEST)"
 	docker build -t $(DOCKER_IMAGE_LATEST) .
+
+.PHONY: docker-build-lambda
+docker-build-lambda: ## Build AWS Lambda container image (with AWS Lambda Web Adapter)
+	@echo "==> Building AWS Lambda Docker image $(DOCKER_LAMBDA_LATEST)"
+	docker build -f Dockerfile.lambda -t $(DOCKER_LAMBDA_LATEST) .
 
 .PHONY: docker-build-multiarch
 docker-build-multiarch: ## Build multi-architecture container images (linux/amd64, linux/arm64)

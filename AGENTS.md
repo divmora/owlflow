@@ -45,7 +45,8 @@ owlflow/
 ├── .goreleaser.yaml              # Multi-arch binary compilation configuration
 ├── .release-please-config.json   # Release Please automation configuration
 ├── .release-please-manifest.json # Semantic release version baseline tracker
-├── Dockerfile                    # Multi-stage Go container with AWS Lambda Web Adapter
+├── Dockerfile                    # Minimal multi-stage container for standalone/k8s/ECS
+├── Dockerfile.lambda             # AWS Lambda container runtime with Lambda Web Adapter
 ├── docker-compose.yaml           # Local multi-service orchestration (:8080 backend, :5173 UI)
 ├── Makefile                      # Standardized build & test automation
 ├── go.mod / go.sum               # Go dependencies
