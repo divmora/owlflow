@@ -7,10 +7,22 @@ on:
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Commit SHA'
+        required: false
+        type: string
+      tag_name:
+        description: 'Tag Name'
+        required: false
+        type: string
 
 jobs:
   ci-cd:
     uses: divmora/.github/.github/workflows/docker-publish.yml@main
     with:
       enable-go-quality: true
+      enable-lambda: true
+      sha: ${{ inputs.sha || '' }}
+      tag_name: ${{ inputs.tag_name || '' }}
     secrets: inherit
