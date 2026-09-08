@@ -87,7 +87,7 @@ owlflow/
 │   ├── configuration.md          # Workflow syntax and schema reference
 │   ├── connectors.md             # Built-in connectors reference & custom connectors
 │   ├── templating-and-conditions.md # Templating helpers & condition expressions
-│   ├── deployment.md             # Docker and AWS Lambda deployment guide
+│   ├── deployment.md             # Docker, AWS (Lambda/ECS), and CloudFormation deployment guide
 │   └── ui.md                     # Developer UI and simulator reference
 ├── internal/
 │   ├── connectors/               # Connector implementations
@@ -237,7 +237,7 @@ Comprehensive guides and references are available in the [`docs/`](docs/) direct
 - 🔌 **[Connectors Reference](docs/connectors.md)**: Details on all built-in actions (`http`, `gitlab`, `jira`, `logger`, `internal`) and how to build custom connectors.
 - 🔣 **[Templating & Conditions](docs/templating-and-conditions.md)**: Template functions (`toJson`, `first`, `index`, `hasPrefix`), context variables, and condition evaluation syntax.
 - 🖥️ **[Developer UI & Visualizer](docs/ui.md)**: Interactive web UI, real-time validator, DAG flowchart, and dry-run simulator.
-- 🐳 **[Deployment Guide](docs/deployment.md)**: Running via Docker, Docker Compose, Kubernetes, and AWS Lambda.
+- 🐳 **[Deployment Guide](docs/deployment.md)**: Running via Docker, Docker Compose, Kubernetes, AWS Lambda (Serverless), ECS Fargate, and CloudFormation.
 - 🤖 **[Agent Guidelines](AGENTS.md)**: Architecture, coding conventions, testing procedures, and guidelines for AI coding agents.
 
 ---
