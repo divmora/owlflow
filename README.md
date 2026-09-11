@@ -3,14 +3,16 @@
 [![Latest Release](https://img.shields.io/github/v/release/divmora/owlflow?logo=github)](https://github.com/divmora/owlflow/releases)
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](https://github.com/divmora/.github/blob/main/LICENSING.md)
 [![CI/CD](https://github.com/divmora/owlflow/actions/workflows/ci.yml/badge.svg)](https://github.com/divmora/owlflow/actions)
-[![Security Policy](https://img.shields.io/badge/Security-Policy-green.svg)](SECURITY.md)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/divmora/owlflow)](go.mod)
 [![Live Studio](https://img.shields.io/badge/Live%20Studio-GitHub%20Pages-0284c7?style=flat&logo=github)](https://divmora.github.io/owlflow/)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/divmora/owlflow)
+[![Security Policy](https://img.shields.io/badge/Security-Policy-green.svg)](SECURITY.md)
 
 **OwlFlow** is a lightweight, high-performance, and extensible workflow automation engine written in Go. It enables event-driven and scheduled workflow execution with declarative YAML/JSON configurations, dynamic templating, conditional branching, and modular connectors.
 
 Try the **[OwlFlow Studio Live Playground](https://divmora.github.io/owlflow/)** directly in your browser.
+
+[Live Studio](https://divmora.github.io/owlflow/) • [Roadmap](ROADMAP.md) • [Documentation](docs/overview.md) • [Ask DeepWiki](https://deepwiki.com/divmora/owlflow)
 
 ---
 

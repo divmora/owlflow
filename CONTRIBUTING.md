@@ -13,7 +13,7 @@ All contributors are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md
 ## Development Prerequisites
 
 - **Go**: Version 1.25 or higher.
-- **Node.js**: Version 20 or higher.
+- **Node.js**: Version 24 or higher.
 - **pnpm**: Version 10 or higher (`corepack enable pnpm`).
 - **Git**: Modern version.
 - **Make**: Standard build automation tool.

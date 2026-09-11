@@ -490,17 +490,17 @@ func parseGitLabCommits(rawCommits []interface{}) ([]map[string]interface{}, []s
 		}
 
 		parsed = append(parsed, map[string]interface{}{
-			"id":               id,
-			"short_id":         shortID,
-			"title":            title,
-			"author_name":      authorName,
-			"author_email":     authorEmail,
-			"authored_date":    authoredDate,
-			"committer_name":   committerName,
-			"committer_email":  committerEmail,
-			"committed_date":   committedDate,
-			"message":          message,
-			"raw":              cMap,
+			"id":              id,
+			"short_id":        shortID,
+			"title":           title,
+			"author_name":     authorName,
+			"author_email":    authorEmail,
+			"authored_date":   authoredDate,
+			"committer_name":  committerName,
+			"committer_email": committerEmail,
+			"committed_date":  committedDate,
+			"message":         message,
+			"raw":             cMap,
 		})
 	}
 

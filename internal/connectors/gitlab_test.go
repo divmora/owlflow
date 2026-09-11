@@ -76,10 +76,10 @@ func TestGitLabConnector_CheckMRCommitAuthor(t *testing.T) {
 		{
 			name: "Match Alice by email (case-insensitive)",
 			params: map[string]interface{}{
-				"project_id":         123,
-				"merge_request_iid":  42,
-				"email":              "ALICE@COMPANY.COM",
-				"base_url":           server.URL,
+				"project_id":        123,
+				"merge_request_iid": 42,
+				"email":             "ALICE@COMPANY.COM",
+				"base_url":          server.URL,
 			},
 			expectedIsAuthor: true,
 			expectedMatches:  1,
@@ -88,10 +88,10 @@ func TestGitLabConnector_CheckMRCommitAuthor(t *testing.T) {
 		{
 			name: "Match Bob by author_name",
 			params: map[string]interface{}{
-				"project_id":         123,
-				"merge_request_iid":  42,
-				"author_name":        "Bob Contributor",
-				"base_url":           server.URL,
+				"project_id":        123,
+				"merge_request_iid": 42,
+				"author_name":       "Bob Contributor",
+				"base_url":          server.URL,
 			},
 			expectedIsAuthor: true,
 			expectedMatches:  1,
@@ -100,10 +100,10 @@ func TestGitLabConnector_CheckMRCommitAuthor(t *testing.T) {
 		{
 			name: "Match service bot by general user parameter",
 			params: map[string]interface{}{
-				"project_id":         123,
-				"merge_request_iid":  42,
-				"user":               "bot-service-account",
-				"base_url":           server.URL,
+				"project_id":        123,
+				"merge_request_iid": 42,
+				"user":              "bot-service-account",
+				"base_url":          server.URL,
 			},
 			expectedIsAuthor: true,
 			expectedMatches:  1,
@@ -112,11 +112,11 @@ func TestGitLabConnector_CheckMRCommitAuthor(t *testing.T) {
 		{
 			name: "Match Alice with message_contains filter",
 			params: map[string]interface{}{
-				"project_id":         123,
-				"merge_request_iid":  42,
-				"user":               "alice@company.com",
-				"message_contains":   "Resolves #101",
-				"base_url":           server.URL,
+				"project_id":        123,
+				"merge_request_iid": 42,
+				"user":              "alice@company.com",
+				"message_contains":  "Resolves #101",
+				"base_url":          server.URL,
 			},
 			expectedIsAuthor: true,
 			expectedMatches:  1,
@@ -125,11 +125,11 @@ func TestGitLabConnector_CheckMRCommitAuthor(t *testing.T) {
 		{
 			name: "No match for Alice when message_contains does not match",
 			params: map[string]interface{}{
-				"project_id":         123,
-				"merge_request_iid":  42,
-				"user":               "alice@company.com",
-				"message_contains":   "non-existent tag",
-				"base_url":           server.URL,
+				"project_id":        123,
+				"merge_request_iid": 42,
+				"user":              "alice@company.com",
+				"message_contains":  "non-existent tag",
+				"base_url":          server.URL,
 			},
 			expectedIsAuthor: false,
 			expectedMatches:  0,
@@ -138,10 +138,10 @@ func TestGitLabConnector_CheckMRCommitAuthor(t *testing.T) {
 		{
 			name: "Match all commits with message_regex",
 			params: map[string]interface{}{
-				"project_id":         123,
-				"merge_request_iid":  42,
-				"message_regex":      "(?i)^(feat|fix):",
-				"base_url":           server.URL,
+				"project_id":        123,
+				"merge_request_iid": 42,
+				"message_regex":     "(?i)^(feat|fix):",
+				"base_url":          server.URL,
 			},
 			expectedIsAuthor: true,
 			expectedMatches:  2,
@@ -150,10 +150,10 @@ func TestGitLabConnector_CheckMRCommitAuthor(t *testing.T) {
 		{
 			name: "Unknown user does not match",
 			params: map[string]interface{}{
-				"project_id":         123,
-				"merge_request_iid":  42,
-				"user":               "unknown@company.com",
-				"base_url":           server.URL,
+				"project_id":        123,
+				"merge_request_iid": 42,
+				"user":              "unknown@company.com",
+				"base_url":          server.URL,
 			},
 			expectedIsAuthor: false,
 			expectedMatches:  0,
@@ -162,10 +162,10 @@ func TestGitLabConnector_CheckMRCommitAuthor(t *testing.T) {
 		{
 			name: "Empty commits MR returns is_author=false",
 			params: map[string]interface{}{
-				"project_id":         123,
-				"merge_request_iid":  999,
-				"user":               "alice@company.com",
-				"base_url":           server.URL,
+				"project_id":        123,
+				"merge_request_iid": 999,
+				"user":              "alice@company.com",
+				"base_url":          server.URL,
 			},
 			expectedIsAuthor: false,
 			expectedMatches:  0,

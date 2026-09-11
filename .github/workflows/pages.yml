@@ -20,5 +20,5 @@ jobs:
     with:
       artifact-path: './ui/dist'
       build-command: 'pnpm run build:pages'
-      node-version: '20'
+      node-version: '24'
       package-manager: 'pnpm'

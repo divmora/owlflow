@@ -51,6 +51,7 @@ owlflow/
 ├── Makefile                      # Standardized build & test automation
 ├── go.mod / go.sum               # Go dependencies
 ├── LICENSE                       # Business Source License 1.1 (BSL 1.1)
+├── ROADMAP.md                    # Living product roadmap (future capabilities & technical debt)
 └── README.md
 ```
 
@@ -136,3 +137,4 @@ docker compose up --build
 4. **Conventional Commits**: Enforce Conventional Commits specification (`feat:`, `fix:`, `docs:`, `chore:`, `test:`, `ci:`).
 5. **Markdown Links**: When referencing codebase files or symbols, use GitHub-style markdown file links with `file://` URIs (e.g. `[main.go](file:///path/to/main.go)`).
 6. **Documentation Integrity**: Maintain accuracy across `README.md`, `AGENTS.md`, and `docs/*.md` when adding or modifying connectors, workflow syntax, or endpoints.
+7. **Living Product Roadmap Management**: `ROADMAP.md` is the central living document tracking future capabilities, optimizations, and technical debt. Add new items as identified; prune items immediately upon implementation and verification.
