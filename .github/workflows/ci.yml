@@ -10,7 +10,7 @@ jobs:
   backend-ci:
     uses: divmora/.github/.github/workflows/go-ci.yml@main
     with:
-      go-version: '1.25'
+      go-version: '1.26'
 
   ui-ci:
     uses: divmora/.github/.github/workflows/node-ci.yml@main
