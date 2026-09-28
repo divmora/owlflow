@@ -19,7 +19,7 @@ GIT_COMMIT   ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 BUILD_DATE   ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Go Environment
-GO_MIN_VERSION := 1.25
+GO_MIN_VERSION := 1.26
 GO             ?= go
 GOFLAGS        ?=
 

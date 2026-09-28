@@ -6,7 +6,7 @@ This guide walks you through setting up OwlFlow, configuring environment variabl
 
 ## 1. Prerequisites
 
-- **Go 1.22 or higher** (tested on Go 1.25)
+- **Go 1.22 or higher** (tested on Go 1.26)
 - **Git**
 - Optional: **Docker** (for containerized execution)
 - Optional: `curl` or Postman (for testing webhooks)
