@@ -125,4 +125,4 @@ We adhere to the [Conventional Commits](https://www.conventionalcommits.org/) sp
 
 ## Licensing of Contributions
 
-By submitting a pull request or contributing to this repository, you agree that your contributions will be licensed under the project's **Business Source License 1.1 (BSL 1.1)** (and the resulting Apache License 2.0 conversion terms upon each version's Change Date), as detailed in [LICENSE](LICENSE) and [DIVMORA Licensing Policy](https://github.com/divmora/.github/blob/main/LICENSING.md).
+By submitting a pull request or contributing to this repository, you agree that your contributions will be licensed under the project's **Apache License, Version 2.0**, as detailed in [LICENSE](LICENSE).

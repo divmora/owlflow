@@ -50,7 +50,7 @@ owlflow/
 ├── docker-compose.yaml           # Local multi-service orchestration (:8080 backend, :5173 UI)
 ├── Makefile                      # Standardized build & test automation
 ├── go.mod / go.sum               # Go dependencies
-├── LICENSE                       # Business Source License 1.1 (BSL 1.1)
+├── LICENSE                       # Apache License 2.0
 ├── ROADMAP.md                    # Living product roadmap (future capabilities & technical debt)
 └── README.md
 ```
@@ -127,9 +127,8 @@ docker compose up --build
 ## 4. Agent Working Conventions
 
 1. **Licensing**:
-   - OwlFlow is licensed under the **Business Source License 1.1 (BSL 1.1)**.
-   - Non-production use (development, CI/CD, evaluation) is free; production use requires a commercial license from DIVMORA Technologies.
-   - Changes convert to Apache License 2.0 after three (3) years.
+   - OwlFlow is open-source software licensed under the **Apache License 2.0**.
+   - Free and unrestricted use, modification, and distribution in any environment (commercial, production, homelab) without requiring a commercial license or EULA.
 2. **Package Manager**: Use `pnpm` exclusively within `ui/`. Never generate `package-lock.json` or `yarn.lock`.
 3. **Git Tracking & `.agents/`**:
    - Ephemeral subagent workspaces (e.g. `.agents/worker_*`, `.agents/auditor_*`) are git-ignored.

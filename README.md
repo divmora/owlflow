@@ -1,7 +1,7 @@
 # OwlFlow
 
 [![Latest Release](https://img.shields.io/github/v/release/divmora/owlflow?logo=github)](https://github.com/divmora/owlflow/releases)
-[![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](https://github.com/divmora/.github/blob/main/LICENSING.md)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![CI/CD](https://github.com/divmora/owlflow/actions/workflows/ci.yml/badge.svg)](https://github.com/divmora/owlflow/actions)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/divmora/owlflow)](go.mod)
 [![Live Studio](https://img.shields.io/badge/Live%20Studio-GitHub%20Pages-0284c7?style=flat&logo=github)](https://divmora.github.io/owlflow/)
@@ -285,13 +285,12 @@ Contributions, bug reports, and feature requests are welcome! Please read our co
 
 ---
 
-## 📄 License & Commercial Use
+## 📄 License
 
-This project is licensed under the **Business Source License 1.1 (BSL 1.1)**.
+This project is open-source software licensed under the **Apache License, Version 2.0**.
 
-- **Non-Production Use**: Free of charge for local development, staging, QA, testing, CI/CD automated validation, educational purposes, and proof-of-concept evaluation.
-- **Production Deployments**: Requires a commercial license (EULA) from DIVMORA Technologies.
-- **Change Date**: Converts automatically to **Apache License 2.0** three (3) years after the release date of the specific version.
+- **Free & Unrestricted Use:** Permitted for free use, reproduction, modification, distribution, and execution in any environment (including commercial, enterprise production, SaaS, private, and homelab environments) without requiring any commercial license (EULA) or payment.
+- **Patent Grant & Protection:** Includes standard Apache 2.0 perpetual patent license grants and liability disclaimers.
 
-For commercial inquiries and enterprise licensing, please contact **[licensing@divmora.com](mailto:licensing@divmora.com)** or visit **[divmora.com](https://divmora.com)**. See [LICENSE](LICENSE) and [DIVMORA Licensing Policy](https://github.com/divmora/.github/blob/main/LICENSING.md) for full terms.
+See [LICENSE](LICENSE) for full terms.
 

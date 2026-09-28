@@ -71,7 +71,7 @@ LABEL org.opencontainers.image.title="owlflow" \
       org.opencontainers.image.url="https://github.com/divmora/owlflow" \
       org.opencontainers.image.source="https://github.com/divmora/owlflow" \
       org.opencontainers.image.vendor="divmora" \
-      org.opencontainers.image.licenses="BSL-1.1"
+      org.opencontainers.image.licenses="Apache-2.0"
 
 ENV PORT=8080 \
     USER=owlflow \
