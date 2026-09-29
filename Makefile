@@ -138,6 +138,11 @@ ui-pages: ## Build unified GitHub Pages bundle (Studio + Docs + AI manifests)
 	@echo "==> Building unified GitHub Pages bundle"
 	@cd ui && pnpm build:pages
 
+.PHONY: docs
+docs: ## Build standalone documentation website (dist-docs)
+	@echo "==> Building standalone documentation website"
+	@node scripts/build-docs.js dist-docs
+
 # ==============================================================================
 # Container Image Targets
 # ==============================================================================

@@ -18,6 +18,7 @@ jobs:
   deploy:
     uses: divmora/.github/.github/workflows/pages-deploy.yml@main
     with:
+      working-directory: 'ui'
       artifact-path: './ui/dist'
       build-command: 'pnpm run build:pages'
       node-version: '24'
