@@ -116,13 +116,13 @@ OwlFlow provides comprehensive AWS deployment support for both serverless event-
 
 ### Automated Deployment via CloudFormation (Recommended)
 
-Official, production-ready CloudFormation templates are maintained in the [**divmora/cloudformation-templates**](https://github.com/divmora/cloudformation-templates) repository under [`owlflow/`](https://github.com/divmora/cloudformation-templates/tree/main/owlflow):
+Official, production-ready CloudFormation templates are maintained in the [`deploy/cloudformation/`](../deploy/cloudformation/) directory within this repository:
 
-- **[`owlflow-lambda.yaml`](https://github.com/divmora/cloudformation-templates/blob/main/owlflow/owlflow-lambda.yaml)** *(Serverless / Event-driven)*:
+- **[`lambda.yaml`](../deploy/cloudformation/lambda.yaml)** *(Serverless / Event-driven)*:
   - **Lambda Function URL**: Direct public or IAM-authenticated HTTPS webhook ingress without requiring an API Gateway or ALB.
   - **VPC Deployment Support**: Optional placement into VPC private subnets (`VpcSubnetIds`, `VpcSecurityGroupIds`) for interacting with internal self-hosted GitLab, private databases, or internal networks.
   - **Auto-Configured Roles & Logging**: Configures least-privilege IAM execution roles, automatic VPC ENI permissions (`AWSLambdaVPCAccessExecutionRole`), and CloudWatch log groups with retention policies.
-- **[`owlflow-ecs-fargate.yaml`](https://github.com/divmora/cloudformation-templates/blob/main/owlflow/owlflow-ecs-fargate.yaml)** *(Continuous Daemon / Cron)*:
+- **[`ecs-fargate.yaml`](../deploy/cloudformation/ecs-fargate.yaml)** *(Continuous Daemon / Cron)*:
   - For long-running cron scheduler daemons, sub-minute workflows, or continuous high-frequency execution on AWS ECS Fargate.
 
 #### Quick Deploy with CloudFormation:
@@ -134,7 +134,7 @@ docker push <your-account-id>.dkr.ecr.<region>.amazonaws.com/owlflow-lambda:late
 
 # 2. Deploy standard serverless stack
 aws cloudformation deploy \
-  --template-file owlflow/owlflow-lambda.yaml \
+  --template-file deploy/cloudformation/lambda.yaml \
   --stack-name owlflow-lambda-prod \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameter-overrides \
@@ -150,7 +150,7 @@ aws cloudformation deploy \
 #     ...
 ```
 
-For full parameter references, VPC routing notes, and ECS Fargate deployment instructions, see [**cloudformation-templates/owlflow/README.md**](https://github.com/divmora/cloudformation-templates/blob/main/owlflow/README.md).
+For full parameter references, VPC routing notes, and ECS Fargate deployment instructions, see [**deploy/cloudformation/README.md**](../deploy/cloudformation/README.md).
 
 ---
 

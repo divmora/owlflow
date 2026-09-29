@@ -21,3 +21,8 @@ jobs:
       test-command: 'test'
       enable-build: true
       build-command: 'pnpm build'
+
+  cfn-ci:
+    uses: divmora/.github/.github/workflows/cfn-ci.yml@main
+    with:
+      template-directory: 'deploy/cloudformation'

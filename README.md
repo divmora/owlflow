@@ -107,6 +107,11 @@ owlflow/
 │   │   └── workflow.go           # Workflow domain models and validation
 │   └── server/
 │       └── api.go                # Gin API routes and webhook security
+├── deploy/                       # Infrastructure-as-Code deployment templates
+│   └── cloudformation/           # AWS CloudFormation templates (Lambda & ECS Fargate)
+│       ├── lambda.yaml           # Serverless Lambda deployment via AWS Lambda Web Adapter
+│       ├── ecs-fargate.yaml      # ECS Fargate deployment for continuous daemons
+│       └── README.md             # CloudFormation parameter references & deployment guide
 ├── ui/                           # Standalone React + Vite + Tailwind Developer UI
 │   ├── src/                      # UI components, DAG canvas, simulator engine
 │   ├── Dockerfile                # Dev container with hot reloading
@@ -240,6 +245,7 @@ Comprehensive guides and references are available in the [`docs/`](docs/) direct
 - 🔣 **[Templating & Conditions](docs/templating-and-conditions.md)**: Template functions (`toJson`, `first`, `index`, `hasPrefix`), context variables, and condition evaluation syntax.
 - 🖥️ **[Developer UI & Visualizer](docs/ui.md)**: Interactive web UI, real-time validator, DAG flowchart, and dry-run simulator.
 - 🐳 **[Deployment Guide](docs/deployment.md)**: Running via Docker, Docker Compose, Kubernetes, AWS Lambda (Serverless), ECS Fargate, and CloudFormation.
+- ☁️ **[CloudFormation Templates](deploy/cloudformation/)**: Production-ready AWS IaC templates for Lambda and ECS Fargate deployments with full parameter references.
 - 🤖 **[Agent Guidelines](AGENTS.md)**: Architecture, coding conventions, testing procedures, and guidelines for AI coding agents.
 
 ---
@@ -261,6 +267,9 @@ make test-coverage
 # Format Go source code and run static analysis
 make fmt
 make lint
+
+# Lint CloudFormation templates (requires cfn-lint)
+make cfn-lint
 
 # Run UI tests and build production assets
 make ui-test

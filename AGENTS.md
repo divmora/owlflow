@@ -29,6 +29,11 @@ owlflow/
 │   │   └── workflow.go           # Workflow domain types and validation logic
 │   ├── logging/                  # Application logging and Syslog integration
 │   └── server/                   # Gin HTTP REST API and webhook ingress security
+├── deploy/                       # Infrastructure-as-Code deployment templates
+│   └── cloudformation/           # AWS CloudFormation templates (Lambda & ECS Fargate)
+│       ├── lambda.yaml           # Serverless Lambda deployment via AWS Lambda Web Adapter
+│       ├── ecs-fargate.yaml      # ECS Fargate deployment for continuous daemons
+│       └── README.md             # CloudFormation parameter references & deployment guide
 ├── pkg/
 │   └── version/                  # Version build metadata & introspection
 ├── ui/                           # Standalone React + Vite + Tailwind CSS Developer UI
