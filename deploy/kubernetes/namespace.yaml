@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: owlflow
+  labels:
+    app.kubernetes.io/name: owlflow
+    app.kubernetes.io/part-of: owlflow

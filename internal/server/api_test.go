@@ -277,3 +277,35 @@ func TestVerifyWebhook_ConstantTimeComparison(t *testing.T) {
 		}
 	})
 }
+
+func TestHealthCheckEndpoints(t *testing.T) {
+	api := NewAPI()
+	router := api.SetupRouter()
+
+	endpoints := []struct {
+		path           string
+		expectedStatus int
+		expectedKey    string
+		expectedVal    string
+	}{
+		{"/healthz", http.StatusOK, "status", "ok"},
+		{"/readyz", http.StatusOK, "status", "ready"},
+		{"/health", http.StatusOK, "status", "ok"},
+	}
+
+	for _, ep := range endpoints {
+		t.Run("GET "+ep.path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, ep.path, nil)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			if w.Code != ep.expectedStatus {
+				t.Errorf("expected HTTP %d, got %d", ep.expectedStatus, w.Code)
+			}
+
+			if !strings.Contains(w.Body.String(), fmt.Sprintf(`"%s":"%s"`, ep.expectedKey, ep.expectedVal)) {
+				t.Errorf("expected body to contain '%s':'%s', got: %s", ep.expectedKey, ep.expectedVal, w.Body.String())
+			}
+		})
+	}
+}
