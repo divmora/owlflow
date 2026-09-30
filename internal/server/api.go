@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/divmora/owlflow/internal/connectors"
@@ -26,16 +28,24 @@ const (
 	WorkflowConfigPath = "./configs/workflows"
 )
 
+var validWorkflowIDRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
 type API struct {
-	Workflows  map[string]*core.Workflow
-	Connectors map[string]connectors.Connector
+	Workflows          map[string]*core.Workflow
+	Connectors         map[string]connectors.Connector
+	WorkflowConfigPath string
 }
 
 func NewAPI() *API {
 	logging.Init()
+	configPath := os.Getenv("WORKFLOW_CONFIG_PATH")
+	if configPath == "" {
+		configPath = WorkflowConfigPath
+	}
 	return &API{
-		Workflows:  make(map[string]*core.Workflow),
-		Connectors: connectors.Registry,
+		Workflows:          make(map[string]*core.Workflow),
+		Connectors:         connectors.Registry,
+		WorkflowConfigPath: configPath,
 	}
 }
 
@@ -64,6 +74,10 @@ func (a *API) handleWebhook(c *gin.Context) {
 	// 1. Load workflow from filesystem
 	wf, err := a.loadWorkflowByID(workflowID)
 	if err != nil {
+		if strings.Contains(err.Error(), "invalid workflow ID") {
+			c.JSON(400, gin.H{"error": "Invalid workflow ID"})
+			return
+		}
 		c.JSON(404, gin.H{"error": "Workflow not found"})
 		return
 	}
@@ -129,20 +143,40 @@ func (a *API) handleWebhook(c *gin.Context) {
 }
 
 func (a *API) loadWorkflowByID(id string) (*core.Workflow, error) {
+	if !validWorkflowIDRegex.MatchString(id) {
+		return nil, fmt.Errorf("invalid workflow ID")
+	}
+
+	configDir := a.WorkflowConfigPath
+	if configDir == "" {
+		configDir = WorkflowConfigPath
+	}
+
+	absConfigPath, err := filepath.Abs(configDir)
+	if err != nil {
+		return nil, fmt.Errorf("invalid workflow config directory: %w", err)
+	}
+
 	// Search for workflow files with matching ID
-	pattern := filepath.Join(WorkflowConfigPath, id+".*")
+	pattern := filepath.Join(configDir, id+".*")
 	matches, err := filepath.Glob(pattern)
 	if err != nil || len(matches) == 0 {
 		return nil, fmt.Errorf("workflow not found")
 	}
 
-	content, err := os.ReadFile(matches[0])
+	// Verify the matched file is strictly within the workflow config directory
+	matchedPath, err := filepath.Abs(matches[0])
+	if err != nil || !strings.HasPrefix(matchedPath, absConfigPath+string(filepath.Separator)) {
+		return nil, fmt.Errorf("invalid workflow ID: directory traversal detected")
+	}
+
+	content, err := os.ReadFile(matchedPath)
 	if err != nil {
 		return nil, err
 	}
 
 	var wf core.Workflow
-	ext := filepath.Ext(matches[0])
+	ext := filepath.Ext(matchedPath)
 	switch ext {
 	case ".json":
 		err = json.Unmarshal(content, &wf)
@@ -191,7 +225,7 @@ func (a *API) verifyWebhook(c *gin.Context, wf *core.Workflow) error {
 	// GitLab Check
 	gitlabToken := c.GetHeader("X-Gitlab-Token")
 	if gitlabToken != "" {
-		if gitlabToken != secret {
+		if subtle.ConstantTimeCompare([]byte(gitlabToken), []byte(secret)) != 1 {
 			return fmt.Errorf("invalid gitlab token")
 		}
 		return nil
