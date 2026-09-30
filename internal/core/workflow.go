@@ -1,6 +1,9 @@
 package core
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type WorkflowStatus string
 
@@ -54,11 +57,46 @@ type Workflow struct {
 	StepsMap map[string]*Step `json:"-"`
 }
 
+// InitStepsMap initializes or refreshes the internal StepsMap lookup.
+func (w *Workflow) InitStepsMap() {
+	w.StepsMap = make(map[string]*Step, len(w.Steps))
+	for i := range w.Steps {
+		step := &w.Steps[i]
+		if step.Retries == 0 {
+			step.Retries = 1
+		}
+		if step.NextSteps == nil {
+			step.NextSteps = make([]NextStep, 0)
+		}
+		w.StepsMap[step.ID] = step
+	}
+}
+
 func (w *Workflow) Validate() error {
-	// Check initial step exists
-	initialStep := w.Trigger.Config["initial_step"].(string)
+	if len(w.Steps) == 0 {
+		return fmt.Errorf("workflow must contain at least one step")
+	}
+
+	if w.StepsMap == nil {
+		w.InitStepsMap()
+	}
+
+	if w.Trigger.Config == nil {
+		return fmt.Errorf("trigger config is required")
+	}
+
+	rawInitialStep, exists := w.Trigger.Config["initial_step"]
+	if !exists || rawInitialStep == nil {
+		return fmt.Errorf("missing required 'initial_step' in trigger config")
+	}
+
+	initialStep, ok := rawInitialStep.(string)
+	if !ok || strings.TrimSpace(initialStep) == "" {
+		return fmt.Errorf("trigger config 'initial_step' must be a non-empty string")
+	}
+
 	if _, exists := w.StepsMap[initialStep]; !exists {
-		return fmt.Errorf("initial step %s not found", initialStep)
+		return fmt.Errorf("initial step '%s' not found", initialStep)
 	}
 
 	// Validate all next_steps references
