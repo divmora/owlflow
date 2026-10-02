@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 )
 
 func evaluateCondition(condition string, ctx ExecutionContext) (bool, error) {
@@ -345,18 +344,4 @@ func parsePotentialJSON(s string) (interface{}, error) {
 		}
 	}
 	return s, nil
-}
-
-func retry(step *Step, fn func() error) error {
-	maxRetries := step.Retries
-	backoff := time.Second
-	for i := 0; i < maxRetries; i++ {
-		err := fn()
-		if err == nil {
-			return nil
-		}
-		time.Sleep(backoff)
-		backoff *= 2
-	}
-	return fmt.Errorf("max retries exceeded")
 }

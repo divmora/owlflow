@@ -62,9 +62,6 @@ func (w *Workflow) InitStepsMap() {
 	w.StepsMap = make(map[string]*Step, len(w.Steps))
 	for i := range w.Steps {
 		step := &w.Steps[i]
-		if step.Retries == 0 {
-			step.Retries = 1
-		}
 		if step.NextSteps == nil {
 			step.NextSteps = make([]NextStep, 0)
 		}

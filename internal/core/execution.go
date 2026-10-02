@@ -204,7 +204,7 @@ func (e *Executor) executeStep(ctx context.Context, step *Step, execData Executi
 
 	// Execute with retries
 	var output interface{}
-	err = retry(step, func() error {
+	err = retryWithContext(ctx, step, func() error {
 		result, err := connector.Execute(parts[1], params)
 		if err != nil {
 			log.Printf("[Executor] Error executing step '%s': %v", step.ID, err)
@@ -213,10 +213,69 @@ func (e *Executor) executeStep(ctx context.Context, step *Step, execData Executi
 		output = result
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	log.Printf("[Executor] Step '%s' completed successfully", step.ID)
 
-	return output, err
+	return output, nil
+}
+
+func retry(step *Step, fn func() error) error {
+	return retryWithBackoff(context.Background(), step, time.Second, fn)
+}
+
+func retryWithContext(ctx context.Context, step *Step, fn func() error) error {
+	return retryWithBackoff(ctx, step, time.Second, fn)
+}
+
+func retryWithBackoff(ctx context.Context, step *Step, initialBackoff time.Duration, fn func() error) error {
+	if step == nil {
+		return fmt.Errorf("step cannot be nil")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if initialBackoff <= 0 {
+		initialBackoff = time.Millisecond
+	}
+
+	maxRetries := step.Retries
+	if maxRetries < 0 {
+		maxRetries = 0
+	}
+
+	backoff := initialBackoff
+	var lastErr error
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if err := ctx.Err(); err != nil {
+			if lastErr != nil {
+				return fmt.Errorf("context cancelled during retry: %w (last error: %v)", err, lastErr)
+			}
+			return err
+		}
+
+		lastErr = fn()
+		if lastErr == nil {
+			return nil
+		}
+
+		if attempt < maxRetries {
+			select {
+			case <-ctx.Done():
+				return fmt.Errorf("context cancelled during backoff: %w (last error: %v)", ctx.Err(), lastErr)
+			case <-time.After(backoff):
+			}
+			backoff *= 2
+		}
+	}
+
+	if maxRetries == 0 {
+		return lastErr
+	}
+	return fmt.Errorf("max retries exceeded: %w", lastErr)
 }
 
 // Copy Deep copy implementation for ExecutionContext

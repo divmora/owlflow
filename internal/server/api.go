@@ -220,11 +220,6 @@ func (a *API) loadWorkflowByID(id string) (*core.Workflow, error) {
 			step.NextSteps = make([]core.NextStep, 0)
 		}
 
-		// Set default retries if not specified
-		if step.Retries == 0 {
-			step.Retries = 1
-		}
-
 		wf.StepsMap[step.ID] = step
 	}
 
