@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -62,6 +63,140 @@ steps:
 `
 	if err := os.WriteFile(filepath.Join(dir, "draft-wf.yaml"), []byte(draftYaml), 0644); err != nil {
 		t.Fatalf("failed to create test draft workflow: %v", err)
+	}
+
+	// 3. Disabled workflow
+	disabledYaml := `
+id: disabled-wf
+name: Disabled Workflow
+status: disabled
+trigger:
+  type: webhook
+  config:
+    initial_step: step1
+steps:
+  - id: step1
+    action: logger.info
+    params:
+      message: "disabled hello"
+`
+	if err := os.WriteFile(filepath.Join(dir, "disabled-wf.yaml"), []byte(disabledYaml), 0644); err != nil {
+		t.Fatalf("failed to create test disabled workflow: %v", err)
+	}
+
+	// 4. Open workflow (no secret)
+	openYaml := `
+id: open-wf
+name: Open Workflow
+status: active
+trigger:
+  type: webhook
+  config:
+    initial_step: step1
+steps:
+  - id: step1
+    action: logger.info
+    params:
+      message: "open hello"
+`
+	if err := os.WriteFile(filepath.Join(dir, "open-wf.yaml"), []byte(openYaml), 0644); err != nil {
+		t.Fatalf("failed to create test open workflow: %v", err)
+	}
+
+	// 5. Invalid validation workflow (missing matching initial_step)
+	invalidValYaml := `
+id: invalid-validation-wf
+name: Invalid Workflow
+status: active
+trigger:
+  type: webhook
+  config:
+    initial_step: nonexistent_step
+steps:
+  - id: step1
+    action: logger.info
+    params:
+      message: "hello"
+`
+	if err := os.WriteFile(filepath.Join(dir, "invalid-validation-wf.yaml"), []byte(invalidValYaml), 0644); err != nil {
+		t.Fatalf("failed to create test invalid validation workflow: %v", err)
+	}
+
+	// 6. Failing execution workflow
+	failingYaml := `
+id: failing-wf
+name: Failing Workflow
+status: active
+trigger:
+  type: webhook
+  config:
+    initial_step: step1
+steps:
+  - id: step1
+    action: nonexistent_connector.action
+    params:
+      message: "will fail"
+`
+	if err := os.WriteFile(filepath.Join(dir, "failing-wf.yaml"), []byte(failingYaml), 0644); err != nil {
+		t.Fatalf("failed to create test failing workflow: %v", err)
+	}
+
+	// 7. JSON workflow
+	jsonWf := `{
+  "id": "json-wf",
+  "name": "JSON Workflow",
+  "status": "active",
+  "trigger": {
+    "type": "webhook",
+    "config": {
+      "initial_step": "step1"
+    }
+  },
+  "steps": [
+    {
+      "id": "step1",
+      "action": "logger.info",
+      "params": {
+        "message": "hello from json"
+      }
+    }
+  ]
+}`
+	if err := os.WriteFile(filepath.Join(dir, "json-wf.json"), []byte(jsonWf), 0644); err != nil {
+		t.Fatalf("failed to create test JSON workflow: %v", err)
+	}
+
+	// 8. Corrupted YAML workflow
+	corruptedYaml := `
+id: corrupted-wf
+name: [unterminated list
+`
+	if err := os.WriteFile(filepath.Join(dir, "corrupted-wf.yaml"), []byte(corruptedYaml), 0644); err != nil {
+		t.Fatalf("failed to create test corrupted workflow: %v", err)
+	}
+
+	// 9. Mismatched ID workflow
+	mismatchYaml := `
+id: internal-id-differs
+name: Mismatch Workflow
+status: active
+trigger:
+  type: webhook
+  config:
+    initial_step: step1
+steps:
+  - id: step1
+    action: logger.info
+    params:
+      message: "mismatch"
+`
+	if err := os.WriteFile(filepath.Join(dir, "mismatch-wf.yaml"), []byte(mismatchYaml), 0644); err != nil {
+		t.Fatalf("failed to create test mismatch workflow: %v", err)
+	}
+
+	// 10. Unsupported format workflow
+	if err := os.WriteFile(filepath.Join(dir, "unsupported-wf.txt"), []byte("plain text content"), 0644); err != nil {
+		t.Fatalf("failed to create test unsupported workflow: %v", err)
 	}
 
 	return dir
@@ -475,5 +610,292 @@ func TestGetRequestBody_CachingAndRewind(t *testing.T) {
 	}
 	if string(readDirect) != bodyContent {
 		t.Fatalf("expected '%s' from direct body read, got '%s'", bodyContent, string(readDirect))
+	}
+}
+
+func TestHandleWebhook_ErrorResponses(t *testing.T) {
+	dir := setupTestWorkflowDir(t)
+
+	api := NewAPI()
+	api.WorkflowConfigPath = dir
+	router := api.SetupRouter()
+
+	t.Run("Disabled workflow returns 403 Forbidden", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhook/disabled-wf", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusForbidden {
+			t.Fatalf("expected HTTP 403 Forbidden for disabled workflow, got %d. Body: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), "Workflow is not active") {
+			t.Errorf("expected body to contain 'Workflow is not active', got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("Invalid workflow validation structure returns 400 Bad Request", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhook/invalid-validation-wf", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected HTTP 400 Bad Request for invalid workflow structure, got %d. Body: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), "Invalid workflow:") {
+			t.Errorf("expected body to contain 'Invalid workflow:', got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("Malformed JSON payload returns 400 Bad Request", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhook/open-wf", strings.NewReader(`{"unclosed_json: true`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected HTTP 400 Bad Request for malformed JSON, got %d. Body: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), "Invalid payload") {
+			t.Errorf("expected body to contain 'Invalid payload', got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("Malformed URL-encoded query returns 400 Bad Request", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhook/open-wf", strings.NewReader(`key=%zz`))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected HTTP 400 Bad Request for malformed urlencoded query, got %d. Body: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), "Invalid payload") {
+			t.Errorf("expected body to contain 'Invalid payload', got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("Lambda environment executes synchronously even when step fails", func(t *testing.T) {
+		t.Setenv("AWS_LAMBDA_FUNCTION_NAME", "owlflow-lambda-test")
+
+		req := httptest.NewRequest(http.MethodPost, "/webhook/failing-wf", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected HTTP 200 OK in Lambda environment, got %d. Body: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), `"status":"completed"`) {
+			t.Errorf("expected body to contain '\"status\":\"completed\"', got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("Standard async mode accepts failing workflow and logs in background", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhook/failing-wf", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusAccepted {
+			t.Fatalf("expected HTTP 202 Accepted in standard async mode, got %d. Body: %s", w.Code, w.Body.String())
+		}
+	})
+}
+
+func TestHandleWebhook_UnauthenticatedWebhook(t *testing.T) {
+	dir := setupTestWorkflowDir(t)
+
+	api := NewAPI()
+	api.WorkflowConfigPath = dir
+	router := api.SetupRouter()
+
+	t.Run("Open webhook without secret accepts requests without auth headers", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhook/open-wf", strings.NewReader(`{"hello":"unauthenticated"}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusAccepted {
+			t.Fatalf("expected HTTP 202 Accepted for open webhook, got %d. Body: %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("Open webhook executes synchronously in Lambda mode", func(t *testing.T) {
+		t.Setenv("AWS_LAMBDA_FUNCTION_NAME", "owlflow-lambda-test")
+
+		req := httptest.NewRequest(http.MethodPost, "/webhook/open-wf", strings.NewReader(`{"hello":"lambda"}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected HTTP 200 OK for open webhook in Lambda mode, got %d. Body: %s", w.Code, w.Body.String())
+		}
+	})
+}
+
+func TestLoadWorkflowByID_FormatsAndValidation(t *testing.T) {
+	dir := setupTestWorkflowDir(t)
+
+	api := NewAPI()
+	api.WorkflowConfigPath = dir
+
+	t.Run("Loads valid JSON workflow file", func(t *testing.T) {
+		wf, err := api.loadWorkflowByID("json-wf")
+		if err != nil {
+			t.Fatalf("expected to load json-wf successfully, got: %v", err)
+		}
+		if wf.ID != "json-wf" {
+			t.Errorf("expected workflow ID 'json-wf', got: %s", wf.ID)
+		}
+		if wf.Name != "JSON Workflow" {
+			t.Errorf("expected workflow Name 'JSON Workflow', got: %s", wf.Name)
+		}
+		if len(wf.Steps) != 1 || wf.StepsMap["step1"] == nil {
+			t.Errorf("expected StepsMap to contain 'step1'")
+		}
+	})
+
+	t.Run("Fails on unsupported file format", func(t *testing.T) {
+		_, err := api.loadWorkflowByID("unsupported-wf")
+		if err == nil {
+			t.Fatalf("expected error for unsupported format, got nil")
+		}
+		if !strings.Contains(err.Error(), "unsupported format") {
+			t.Errorf("expected error containing 'unsupported format', got: %v", err)
+		}
+	})
+
+	t.Run("Fails on corrupted YAML unmarshal error", func(t *testing.T) {
+		_, err := api.loadWorkflowByID("corrupted-wf")
+		if err == nil {
+			t.Fatalf("expected error for corrupted YAML, got nil")
+		}
+	})
+
+	t.Run("Fails on workflow ID mismatch between filename and manifest", func(t *testing.T) {
+		_, err := api.loadWorkflowByID("mismatch-wf")
+		if err == nil {
+			t.Fatalf("expected error for workflow ID mismatch, got nil")
+		}
+		if !strings.Contains(err.Error(), "workflow ID mismatch") {
+			t.Errorf("expected error containing 'workflow ID mismatch', got: %v", err)
+		}
+	})
+
+	t.Run("Fails when workflow file cannot be read due to file permissions", func(t *testing.T) {
+		unreadablePath := filepath.Join(dir, "unreadable-wf.yaml")
+		if err := os.WriteFile(unreadablePath, []byte("id: unreadable-wf\n"), 0644); err != nil {
+			t.Fatalf("failed to write file: %v", err)
+		}
+		if err := os.Chmod(unreadablePath, 0000); err != nil {
+			t.Skipf("cannot chmod 0000 on this environment: %v", err)
+		}
+		defer os.Chmod(unreadablePath, 0644)
+
+		_, err := api.loadWorkflowByID("unreadable-wf")
+		if err == nil {
+			t.Fatalf("expected error reading unreadable workflow file, got nil")
+		}
+	})
+
+	t.Run("Falls back to default WorkflowConfigPath when unset", func(t *testing.T) {
+		apiDefault := NewAPI()
+		apiDefault.WorkflowConfigPath = ""
+		_, err := apiDefault.loadWorkflowByID("nonexistent-wf")
+		if err == nil {
+			t.Fatalf("expected error for nonexistent workflow in default path, got nil")
+		}
+		if !strings.Contains(err.Error(), "workflow not found") {
+			t.Errorf("expected error containing 'workflow not found', got: %v", err)
+		}
+	})
+}
+
+func TestNewAPI_EnvironmentConfiguration(t *testing.T) {
+	t.Run("Default config path when WORKFLOW_CONFIG_PATH is unset", func(t *testing.T) {
+		t.Setenv("WORKFLOW_CONFIG_PATH", "")
+		api := NewAPI()
+		if api.WorkflowConfigPath != WorkflowConfigPath {
+			t.Errorf("expected default config path %s, got: %s", WorkflowConfigPath, api.WorkflowConfigPath)
+		}
+	})
+
+	t.Run("Custom config path when WORKFLOW_CONFIG_PATH is set", func(t *testing.T) {
+		customPath := "/tmp/owlflow-custom-workflows"
+		t.Setenv("WORKFLOW_CONFIG_PATH", customPath)
+		api := NewAPI()
+		if api.WorkflowConfigPath != customPath {
+			t.Errorf("expected custom config path %s, got: %s", customPath, api.WorkflowConfigPath)
+		}
+	})
+}
+
+func TestSetupRouter_SyslogConfiguration(t *testing.T) {
+	t.Setenv("SYSLOG_ENABLED", "true")
+	api := NewAPI()
+	r := api.SetupRouter()
+	if r == nil {
+		t.Fatalf("expected valid gin engine when syslog enabled, got nil")
+	}
+}
+
+type errReader struct{}
+
+func (e *errReader) Read(p []byte) (n int, err error) {
+	return 0, errors.New("simulated read error")
+}
+
+func (e *errReader) Close() error {
+	return nil
+}
+
+func TestGetRequestBody_ReadError(t *testing.T) {
+	api := NewAPI()
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	req := httptest.NewRequest(http.MethodPost, "/test", &errReader{})
+	c.Request = req
+
+	_, err := api.getRequestBody(c)
+	if err == nil {
+		t.Fatalf("expected error from errReader, got nil")
+	}
+}
+
+func TestVerifyWebhook_BodyReadError(t *testing.T) {
+	dir := setupTestWorkflowDir(t)
+	api := NewAPI()
+	api.WorkflowConfigPath = dir
+
+	wf, err := api.loadWorkflowByID("active-wf")
+	if err != nil {
+		t.Fatalf("failed to load workflow: %v", err)
+	}
+
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	req := httptest.NewRequest(http.MethodPost, "/webhook/active-wf", &errReader{})
+	req.Header.Set("X-Hub-Signature-256", "sha256=somehash")
+	c.Request = req
+
+	err = api.verifyWebhook(c, wf)
+	if err == nil {
+		t.Fatalf("expected error when body read fails during verification, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to read body") {
+		t.Errorf("expected 'failed to read body' error, got: %v", err)
+	}
+}
+
+func TestParseWebhookPayload_BodyReadError(t *testing.T) {
+	api := NewAPI()
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	req := httptest.NewRequest(http.MethodPost, "/webhook/test", &errReader{})
+	c.Request = req
+
+	_, err := api.parseWebhookPayload(c)
+	if err == nil {
+		t.Fatalf("expected error when body read fails during payload parsing, got nil")
 	}
 }
