@@ -96,8 +96,11 @@ func (w *Workflow) Validate() error {
 		return fmt.Errorf("initial step '%s' not found", initialStep)
 	}
 
-	// Validate all next_steps references
+	// Validate all steps
 	for _, step := range w.Steps {
+		if step.Timeout < 0 {
+			return fmt.Errorf("step '%s' has invalid negative timeout: %d", step.ID, step.Timeout)
+		}
 		for _, next := range step.NextSteps {
 			if _, exists := w.StepsMap[next.StepID]; !exists {
 				return fmt.Errorf("step %s references invalid next step: %s",
