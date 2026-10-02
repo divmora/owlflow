@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/divmora/owlflow/internal/connectors"
 	"github.com/divmora/owlflow/internal/core"
@@ -57,10 +58,29 @@ func (a *API) SetupRouter() *gin.Engine {
 	}
 	r := gin.Default()
 
-	//r.POST("/workflows/:id/execute", a.executeWorkflow)
+	// Kubernetes and container health probes
+	r.GET("/healthz", a.handleHealthz)
+	r.GET("/readyz", a.handleReadyz)
+	r.GET("/health", a.handleHealthz)
+
+	// Webhook ingress
 	r.POST("/webhook/:id", a.handleWebhook)
 
 	return r
+}
+
+func (a *API) handleHealthz(c *gin.Context) {
+	c.JSON(200, gin.H{
+		"status": "ok",
+		"time":   time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
+func (a *API) handleReadyz(c *gin.Context) {
+	c.JSON(200, gin.H{
+		"status": "ready",
+		"time":   time.Now().UTC().Format(time.RFC3339),
+	})
 }
 
 func (a *API) Start() error {

@@ -103,7 +103,36 @@ docker compose up --build
 
 ---
 
-## 3. AWS Deployment (Lambda & ECS Fargate)
+## 3. Kubernetes Deployment
+
+OwlFlow includes production-grade Kubernetes manifests located in [`deploy/kubernetes/`](../deploy/kubernetes/):
+
+- **Deployment (`deployment.yaml`)**: Runs a 2-replica Deployment with non-root security context (`10001:10001`), dropped capabilities, read-only root filesystem, and native liveness (`/healthz`) and readiness (`/readyz`) probes.
+- **ConfigMap (`configmap.yaml`)**: Declaratively versions and mounts workflow YAML definitions into `/app/configs/workflows` without requiring container rebuilds.
+- **Service & Ingress (`service.yaml`, `ingress.yaml`)**: Exposes port 8080 as a ClusterIP service with TLS-terminated ingress for incoming webhook events (`/webhook/*`).
+- **Autoscaling (`hpa.yaml`)**: Horizontal Pod Autoscaler dynamically scales between 2 and 10 replicas based on CPU and Memory utilization.
+
+### Quick Deploy to Kubernetes:
+
+```bash
+# 1. Create secret from example template
+cp deploy/kubernetes/secret.yaml.example deploy/kubernetes/secret.yaml
+# Fill in your tokens (GITLAB_TOKEN, JIRA_TOKEN, etc.)
+kubectl apply -f deploy/kubernetes/secret.yaml
+
+# 2. Deploy all manifests using Kustomize
+kubectl apply -k deploy/kubernetes/
+
+# 3. Verify status and probes
+kubectl rollout status deployment/owlflow -n owlflow
+kubectl get pods -n owlflow
+```
+
+See the [Kubernetes Deployment Guide](../deploy/kubernetes/README.md) for full configuration details.
+
+---
+
+## 4. AWS Deployment (Lambda & ECS Fargate)
 
 OwlFlow provides comprehensive AWS deployment support for both serverless event-driven execution (AWS Lambda) and continuous daemon workloads (AWS ECS Fargate).
 

@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: owlflow-workflows
+  namespace: owlflow
+  labels:
+    app.kubernetes.io/name: owlflow
+    app.kubernetes.io/component: engine
+data:
+  schedule-monitor.yaml: |
+    id: "schedule-monitor"
+    name: "Periodic Health Monitor"
+    status: "active"
+    trigger:
+      type: "schedule"
+      config:
+        cron: "*/5 * * * *"
+        initial_step: "log_health"
+    steps:
+      - id: "log_health"
+        action: "logger.info"
+        params:
+          message: "Periodic health check executed at {{ .TriggerData.time }}"
+        pass_output: false
+
+  webhook-alert.yaml: |
+    id: "webhook-alert"
+    name: "Webhook Alert Receiver"
+    status: "active"
+    trigger:
+      type: "webhook"
+      config:
+        initial_step: "log_event"
+        secret: "supersecret123"
+    steps:
+      - id: "log_event"
+        action: "logger.info"
+        params:
+          message: "Incoming webhook alert received"
+        pass_output: false
