@@ -793,7 +793,9 @@ func TestLoadWorkflowByID_FormatsAndValidation(t *testing.T) {
 		if err := os.Chmod(unreadablePath, 0000); err != nil {
 			t.Skipf("cannot chmod 0000 on this environment: %v", err)
 		}
-		defer os.Chmod(unreadablePath, 0644)
+		t.Cleanup(func() {
+			_ = os.Chmod(unreadablePath, 0644)
+		})
 
 		_, err := api.loadWorkflowByID("unreadable-wf")
 		if err == nil {
