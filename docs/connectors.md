@@ -6,37 +6,40 @@ Connectors are the modular building blocks that execute actions in an OwlFlow wo
 
 ## 1. HTTP Connector (`http`)
 
-Performs standard HTTP requests.
+Performs standard outbound HTTP requests with configurable headers, payloads, timeouts, and built-in SSRF (Server-Side Request Forgery) protection.
 
-### `http.get`
-Executes an HTTP GET request.
+### Common Parameters
 
-**Parameters:**
-- `url` (`string`, required): Target URL.
+| Parameter | Type | Required | Default | Description |
+| :--- | :--- | :---: | :---: | :--- |
+| `url` | `string` | **Yes** | — | Target URL (must use `http://` or `https://`). |
+| `headers` | `map[string]string` / `map[string]interface{}` | No | `{}` | Custom HTTP request headers. |
+| `body` | `string` / `object` / `array` | No | `""` | Request body payload (POST, PUT, PATCH, DELETE). If given as JSON object or array, automatically serialized with `Content-Type: application/json`. |
+| `timeout` | `int` / `string` | No | `30s` | Request timeout (e.g. `10`, `"15s"`, `"500ms"`). Defaults to 30 seconds. |
+| `allow_private_ips` | `bool` | No | `false` | When `false` (default), blocks requests to loopback (`127.0.0.0/8`, `::1`), private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), and cloud metadata (`169.254.169.254`). Can also be globally enabled with `HTTP_ALLOW_PRIVATE_IPS=true`. |
 
-**Output:**
+### Output
+
+All HTTP actions return a standardized structured response:
+
 ```json
 {
   "status_code": 200,
-  "body": "string response"
+  "body": "{\"status\": \"ok\"}",
+  "headers": {
+    "Content-Type": "application/json",
+    "Date": "Wed, 02 Oct 2026 10:00:00 GMT"
+  }
 }
 ```
 
-### `http.post`
-Executes an HTTP POST request.
+### Supported Actions
 
-**Parameters:**
-- `url` (`string`, required): Target URL.
-- `headers` (`map[string]string`, optional): HTTP request headers.
-- `body` (`string`, optional): Raw payload string or serialized JSON.
-
-**Output:**
-```json
-{
-  "status_code": 201,
-  "body": "{\"id\": 123}"
-}
-```
+- **`http.get`**: Executes an HTTP GET request.
+- **`http.post`**: Executes an HTTP POST request with optional body and headers.
+- **`http.put`**: Executes an HTTP PUT request with optional body and headers.
+- **`http.patch`**: Executes an HTTP PATCH request with partial update payload.
+- **`http.delete`**: Executes an HTTP DELETE request.
 
 ---
 
