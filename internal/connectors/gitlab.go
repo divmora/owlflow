@@ -34,14 +34,29 @@ func (g *GitLabConnector) Execute(action string, params map[string]interface{}) 
 
 	switch action {
 	case "get_project":
-		projectID := params["project_id"]
+		projectID, ok := params["project_id"]
+		if !ok || projectID == nil || fmt.Sprintf("%v", projectID) == "" {
+			return nil, fmt.Errorf("missing project_id")
+		}
 		return g.makeRequest(client, "GET", fmt.Sprintf("%s/projects/%v", baseURL, projectID), token, nil)
 
 	case "create_merge_request":
-		projectID := params["project_id"]
-		sourceBranch := params["source_branch"].(string)
-		targetBranch := params["target_branch"].(string)
-		title := params["title"].(string)
+		projectID, ok := params["project_id"]
+		if !ok || projectID == nil || fmt.Sprintf("%v", projectID) == "" {
+			return nil, fmt.Errorf("missing project_id")
+		}
+		sourceBranch, ok := params["source_branch"].(string)
+		if !ok || sourceBranch == "" {
+			return nil, fmt.Errorf("missing or invalid source_branch")
+		}
+		targetBranch, ok := params["target_branch"].(string)
+		if !ok || targetBranch == "" {
+			return nil, fmt.Errorf("missing or invalid target_branch")
+		}
+		title, ok := params["title"].(string)
+		if !ok || title == "" {
+			return nil, fmt.Errorf("missing or invalid title")
+		}
 
 		payload := map[string]interface{}{
 			"source_branch": sourceBranch,
@@ -51,8 +66,11 @@ func (g *GitLabConnector) Execute(action string, params map[string]interface{}) 
 		return g.makeRequest(client, "POST", fmt.Sprintf("%s/projects/%v/merge_requests", baseURL, projectID), token, payload)
 
 	case "get_user":
-		username := params["username"].(string)
-		resp, err := g.makeRequest(client, "GET", fmt.Sprintf("%s/users?username=%s", baseURL, username), token, nil)
+		username, ok := params["username"].(string)
+		if !ok || username == "" {
+			return nil, fmt.Errorf("missing or invalid username")
+		}
+		resp, err := g.makeRequest(client, "GET", fmt.Sprintf("%s/users?username=%s", baseURL, url.QueryEscape(username)), token, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -67,8 +85,14 @@ func (g *GitLabConnector) Execute(action string, params map[string]interface{}) 
 		return nil, fmt.Errorf("unexpected response format from get_user")
 
 	case "update_merge_request":
-		projectID := params["project_id"]
-		mrIID := params["merge_request_iid"]
+		projectID, ok := params["project_id"]
+		if !ok || projectID == nil || fmt.Sprintf("%v", projectID) == "" {
+			return nil, fmt.Errorf("missing project_id")
+		}
+		mrIID, ok := params["merge_request_iid"]
+		if !ok || mrIID == nil || fmt.Sprintf("%v", mrIID) == "" {
+			return nil, fmt.Errorf("missing merge_request_iid")
+		}
 
 		payload := map[string]interface{}{}
 		if reviewerIDs, ok := params["reviewer_ids"].([]interface{}); ok {
@@ -77,9 +101,19 @@ func (g *GitLabConnector) Execute(action string, params map[string]interface{}) 
 		return g.makeRequest(client, "PUT", fmt.Sprintf("%s/projects/%v/merge_requests/%v", baseURL, projectID, mrIID), token, payload)
 
 	case "add_reviewer":
-		projectID := params["project_id"]
-		mrIID := params["merge_request_iid"]
-		userID, err := toInt(params["user_id"])
+		projectID, ok := params["project_id"]
+		if !ok || projectID == nil || fmt.Sprintf("%v", projectID) == "" {
+			return nil, fmt.Errorf("missing project_id")
+		}
+		mrIID, ok := params["merge_request_iid"]
+		if !ok || mrIID == nil || fmt.Sprintf("%v", mrIID) == "" {
+			return nil, fmt.Errorf("missing merge_request_iid")
+		}
+		rawUserID, ok := params["user_id"]
+		if !ok || rawUserID == nil {
+			return nil, fmt.Errorf("missing user_id")
+		}
+		userID, err := toInt(rawUserID)
 		if err != nil {
 			return nil, fmt.Errorf("invalid user_id: %w", err)
 		}
@@ -185,8 +219,14 @@ func (g *GitLabConnector) Execute(action string, params map[string]interface{}) 
 		return g.makeRequest(client, "PUT", fmt.Sprintf("%s/projects/%v/merge_requests/%v", baseURL, projectID, mrIID), token, payload)
 
 	case "close_mr":
-		projectID := params["project_id"]
-		mrIID := params["merge_request_iid"]
+		projectID, ok := params["project_id"]
+		if !ok || projectID == nil || fmt.Sprintf("%v", projectID) == "" {
+			return nil, fmt.Errorf("missing project_id")
+		}
+		mrIID, ok := params["merge_request_iid"]
+		if !ok || mrIID == nil || fmt.Sprintf("%v", mrIID) == "" {
+			return nil, fmt.Errorf("missing merge_request_iid")
+		}
 
 		payload := map[string]interface{}{
 			"state_event": "close",
@@ -194,30 +234,47 @@ func (g *GitLabConnector) Execute(action string, params map[string]interface{}) 
 		return g.makeRequest(client, "PUT", fmt.Sprintf("%s/projects/%v/merge_requests/%v", baseURL, projectID, mrIID), token, payload)
 
 	case "add_mr_note":
-		projectID := params["project_id"]
-		mrIID := params["merge_request_iid"]
-		body := params["body"].(string)
+		projectID, ok := params["project_id"]
+		if !ok || projectID == nil || fmt.Sprintf("%v", projectID) == "" {
+			return nil, fmt.Errorf("missing project_id")
+		}
+		mrIID, ok := params["merge_request_iid"]
+		if !ok || mrIID == nil || fmt.Sprintf("%v", mrIID) == "" {
+			return nil, fmt.Errorf("missing merge_request_iid")
+		}
+		body, ok := params["body"].(string)
+		if !ok || body == "" {
+			return nil, fmt.Errorf("missing or invalid body")
+		}
 
 		payload := map[string]interface{}{
 			"body": body,
 		}
 		return g.makeRequest(client, "POST", fmt.Sprintf("%s/projects/%v/merge_requests/%v/notes", baseURL, projectID, mrIID), token, payload)
 	case "approve_mr":
-		projectID := params["project_id"]
-		mrIID := params["merge_request_iid"]
+		projectID, ok := params["project_id"]
+		if !ok || projectID == nil || fmt.Sprintf("%v", projectID) == "" {
+			return nil, fmt.Errorf("missing project_id")
+		}
+		mrIID, ok := params["merge_request_iid"]
+		if !ok || mrIID == nil || fmt.Sprintf("%v", mrIID) == "" {
+			return nil, fmt.Errorf("missing merge_request_iid")
+		}
 
 		// Check if already approved if user_id is provided
-		if userID, err := toInt(params["user_id"]); err == nil {
-			approvalsResp, err := g.makeRequest(client, "GET", fmt.Sprintf("%s/projects/%v/merge_requests/%v/approvals", baseURL, projectID, mrIID), token, nil)
-			if err == nil {
-				if approvals, ok := approvalsResp.(map[string]interface{}); ok {
-					if approvedBy, ok := approvals["approved_by"].([]interface{}); ok {
-						for _, a := range approvedBy {
-							if entry, ok := a.(map[string]interface{}); ok {
-								if user, ok := entry["user"].(map[string]interface{}); ok {
-									if id, ok := user["id"].(float64); ok {
-										if int(id) == userID {
-											return map[string]interface{}{"status": "already_approved"}, nil
+		if rawUserID, ok := params["user_id"]; ok && rawUserID != nil {
+			if userID, err := toInt(rawUserID); err == nil {
+				approvalsResp, err := g.makeRequest(client, "GET", fmt.Sprintf("%s/projects/%v/merge_requests/%v/approvals", baseURL, projectID, mrIID), token, nil)
+				if err == nil {
+					if approvals, ok := approvalsResp.(map[string]interface{}); ok {
+						if approvedBy, ok := approvals["approved_by"].([]interface{}); ok {
+							for _, a := range approvedBy {
+								if entry, ok := a.(map[string]interface{}); ok {
+									if user, ok := entry["user"].(map[string]interface{}); ok {
+										if id, ok := user["id"].(float64); ok {
+											if int(id) == userID {
+												return map[string]interface{}{"status": "already_approved"}, nil
+											}
 										}
 									}
 								}
@@ -232,12 +289,12 @@ func (g *GitLabConnector) Execute(action string, params map[string]interface{}) 
 
 	case "get_mr_commits":
 		projectID, ok := params["project_id"]
-		if !ok || projectID == nil {
+		if !ok || projectID == nil || fmt.Sprintf("%v", projectID) == "" {
 			return nil, fmt.Errorf("missing project_id")
 		}
 
 		mrIID, ok := params["merge_request_iid"]
-		if !ok || mrIID == nil {
+		if !ok || mrIID == nil || fmt.Sprintf("%v", mrIID) == "" {
 			return nil, fmt.Errorf("missing merge_request_iid")
 		}
 
@@ -272,12 +329,12 @@ func (g *GitLabConnector) Execute(action string, params map[string]interface{}) 
 
 	case "check_mr_commit_author":
 		projectID, ok := params["project_id"]
-		if !ok || projectID == nil {
+		if !ok || projectID == nil || fmt.Sprintf("%v", projectID) == "" {
 			return nil, fmt.Errorf("missing project_id")
 		}
 
 		mrIID, ok := params["merge_request_iid"]
-		if !ok || mrIID == nil {
+		if !ok || mrIID == nil || fmt.Sprintf("%v", mrIID) == "" {
 			return nil, fmt.Errorf("missing merge_request_iid")
 		}
 
@@ -569,7 +626,13 @@ func (g *GitLabConnector) makeRequest(client *http.Client, method, url, token st
 }
 
 func (g *GitLabConnector) Validate(params map[string]interface{}) error {
-	if _, ok := params["project_id"]; !ok {
+	if params == nil {
+		return fmt.Errorf("missing project_id")
+	}
+	if u, ok := params["username"]; ok && u != nil && fmt.Sprintf("%v", u) != "" {
+		return nil
+	}
+	if pid, ok := params["project_id"]; !ok || pid == nil || fmt.Sprintf("%v", pid) == "" {
 		return fmt.Errorf("missing project_id")
 	}
 	return nil

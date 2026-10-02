@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -246,4 +247,286 @@ func TestGitLabConnector_GetMRCommits(t *testing.T) {
 	if !ok || len(authors) != 2 {
 		t.Errorf("expected 2 authors, got %v", authors)
 	}
+}
+
+func TestGitLabConnector_Validate(t *testing.T) {
+	connector := &GitLabConnector{}
+
+	t.Run("nil params returns error", func(t *testing.T) {
+		err := connector.Validate(nil)
+		if err == nil {
+			t.Fatal("expected error for nil params, got nil")
+		}
+	})
+
+	t.Run("empty params returns error", func(t *testing.T) {
+		err := connector.Validate(map[string]interface{}{})
+		if err == nil {
+			t.Fatal("expected error for empty params, got nil")
+		}
+	})
+
+	t.Run("empty string project_id returns error", func(t *testing.T) {
+		err := connector.Validate(map[string]interface{}{"project_id": ""})
+		if err == nil {
+			t.Fatal("expected error for empty project_id, got nil")
+		}
+	})
+
+	t.Run("valid project_id succeeds", func(t *testing.T) {
+		err := connector.Validate(map[string]interface{}{"project_id": 123})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("valid username succeeds without project_id", func(t *testing.T) {
+		err := connector.Validate(map[string]interface{}{"username": "alice"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+}
+
+func TestGitLabConnector_CreateMergeRequest_Validation(t *testing.T) {
+	connector := &GitLabConnector{}
+
+	// Must not panic on missing or non-string parameters
+	cases := []struct {
+		name        string
+		params      map[string]interface{}
+		expectedErr string
+	}{
+		{
+			name:        "missing project_id",
+			params:      map[string]interface{}{"source_branch": "feat", "target_branch": "main", "title": "test"},
+			expectedErr: "missing project_id",
+		},
+		{
+			name:        "missing source_branch",
+			params:      map[string]interface{}{"project_id": 123, "target_branch": "main", "title": "test"},
+			expectedErr: "missing or invalid source_branch",
+		},
+		{
+			name:        "non-string source_branch",
+			params:      map[string]interface{}{"project_id": 123, "source_branch": 456, "target_branch": "main", "title": "test"},
+			expectedErr: "missing or invalid source_branch",
+		},
+		{
+			name:        "missing target_branch",
+			params:      map[string]interface{}{"project_id": 123, "source_branch": "feat", "title": "test"},
+			expectedErr: "missing or invalid target_branch",
+		},
+		{
+			name:        "non-string target_branch",
+			params:      map[string]interface{}{"project_id": 123, "source_branch": "feat", "target_branch": true, "title": "test"},
+			expectedErr: "missing or invalid target_branch",
+		},
+		{
+			name:        "missing title",
+			params:      map[string]interface{}{"project_id": 123, "source_branch": "feat", "target_branch": "main"},
+			expectedErr: "missing or invalid title",
+		},
+		{
+			name:        "non-string title",
+			params:      map[string]interface{}{"project_id": 123, "source_branch": "feat", "target_branch": "main", "title": 999},
+			expectedErr: "missing or invalid title",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := connector.Execute("create_merge_request", tc.params)
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tc.expectedErr)
+			}
+			if !strings.Contains(err.Error(), tc.expectedErr) {
+				t.Errorf("expected error containing %q, got %v", tc.expectedErr, err)
+			}
+		})
+	}
+}
+
+func TestGitLabConnector_GetUser_ValidationAndExecution(t *testing.T) {
+	connector := &GitLabConnector{}
+
+	t.Run("missing username returns error", func(t *testing.T) {
+		_, err := connector.Execute("get_user", map[string]interface{}{})
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "missing or invalid username") {
+			t.Errorf("expected 'missing or invalid username', got %v", err)
+		}
+	})
+
+	t.Run("non-string username returns error", func(t *testing.T) {
+		_, err := connector.Execute("get_user", map[string]interface{}{"username": 12345})
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), "missing or invalid username") {
+			t.Errorf("expected 'missing or invalid username', got %v", err)
+		}
+	})
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Query().Get("username") == "alice" {
+			_ = json.NewEncoder(w).Encode([]interface{}{
+				map[string]interface{}{"id": 101, "username": "alice", "name": "Alice Smith"},
+			})
+			return
+		}
+		if r.URL.Query().Get("username") == "nobody" {
+			_ = json.NewEncoder(w).Encode([]interface{}{})
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	t.Run("user found returns first item", func(t *testing.T) {
+		res, err := connector.Execute("get_user", map[string]interface{}{
+			"username": "alice",
+			"base_url": server.URL,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		userMap, ok := res.(map[string]interface{})
+		if !ok {
+			t.Fatalf("expected map[string]interface{}, got %T", res)
+		}
+		if userMap["username"] != "alice" {
+			t.Errorf("expected username 'alice', got %v", userMap["username"])
+		}
+	})
+
+	t.Run("user not found returns error", func(t *testing.T) {
+		_, err := connector.Execute("get_user", map[string]interface{}{
+			"username": "nobody",
+			"base_url": server.URL,
+		})
+		if err == nil {
+			t.Fatal("expected error for non-existent user, got nil")
+		}
+		if !strings.Contains(err.Error(), "user not found") {
+			t.Errorf("expected 'user not found' error, got %v", err)
+		}
+	})
+}
+
+func TestGitLabConnector_AddMRNote_Validation(t *testing.T) {
+	connector := &GitLabConnector{}
+
+	cases := []struct {
+		name        string
+		params      map[string]interface{}
+		expectedErr string
+	}{
+		{
+			name:        "missing project_id",
+			params:      map[string]interface{}{"merge_request_iid": 1, "body": "note"},
+			expectedErr: "missing project_id",
+		},
+		{
+			name:        "missing merge_request_iid",
+			params:      map[string]interface{}{"project_id": 123, "body": "note"},
+			expectedErr: "missing merge_request_iid",
+		},
+		{
+			name:        "missing body",
+			params:      map[string]interface{}{"project_id": 123, "merge_request_iid": 1},
+			expectedErr: "missing or invalid body",
+		},
+		{
+			name:        "non-string body",
+			params:      map[string]interface{}{"project_id": 123, "merge_request_iid": 1, "body": 12345},
+			expectedErr: "missing or invalid body",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := connector.Execute("add_mr_note", tc.params)
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tc.expectedErr)
+			}
+			if !strings.Contains(err.Error(), tc.expectedErr) {
+				t.Errorf("expected error containing %q, got %v", tc.expectedErr, err)
+			}
+		})
+	}
+}
+
+func TestGitLabConnector_AddReviewer_Validation(t *testing.T) {
+	connector := &GitLabConnector{}
+
+	cases := []struct {
+		name        string
+		params      map[string]interface{}
+		expectedErr string
+	}{
+		{
+			name:        "missing project_id",
+			params:      map[string]interface{}{"merge_request_iid": 1, "user_id": 10},
+			expectedErr: "missing project_id",
+		},
+		{
+			name:        "missing merge_request_iid",
+			params:      map[string]interface{}{"project_id": 123, "user_id": 10},
+			expectedErr: "missing merge_request_iid",
+		},
+		{
+			name:        "missing user_id",
+			params:      map[string]interface{}{"project_id": 123, "merge_request_iid": 1},
+			expectedErr: "missing user_id",
+		},
+		{
+			name:        "invalid user_id",
+			params:      map[string]interface{}{"project_id": 123, "merge_request_iid": 1, "user_id": "not-an-int"},
+			expectedErr: "invalid user_id",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := connector.Execute("add_reviewer", tc.params)
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tc.expectedErr)
+			}
+			if !strings.Contains(err.Error(), tc.expectedErr) {
+				t.Errorf("expected error containing %q, got %v", tc.expectedErr, err)
+			}
+		})
+	}
+}
+
+func TestGitLabConnector_Actions_ProjectAndMRValidation(t *testing.T) {
+	connector := &GitLabConnector{}
+
+	actions := []string{"close_mr", "approve_mr", "update_merge_request"}
+	for _, action := range actions {
+		t.Run(action+" missing project_id", func(t *testing.T) {
+			_, err := connector.Execute(action, map[string]interface{}{"merge_request_iid": 1})
+			if err == nil || !strings.Contains(err.Error(), "missing project_id") {
+				t.Errorf("expected 'missing project_id' error, got %v", err)
+			}
+		})
+
+		t.Run(action+" missing merge_request_iid", func(t *testing.T) {
+			_, err := connector.Execute(action, map[string]interface{}{"project_id": 123})
+			if err == nil || !strings.Contains(err.Error(), "missing merge_request_iid") {
+				t.Errorf("expected 'missing merge_request_iid' error, got %v", err)
+			}
+		})
+	}
+
+	t.Run("get_project missing project_id", func(t *testing.T) {
+		_, err := connector.Execute("get_project", map[string]interface{}{})
+		if err == nil || !strings.Contains(err.Error(), "missing project_id") {
+			t.Errorf("expected 'missing project_id' error, got %v", err)
+		}
+	})
 }

@@ -116,3 +116,63 @@ func TestExecutor_RunScheduled_NilConfig(t *testing.T) {
 		t.Fatal("expected error when schedule trigger config is nil, got nil")
 	}
 }
+
+func TestExecutor_ExecuteStep_ConnectorValidationFailure(t *testing.T) {
+	wf := &Workflow{
+		ID:     "validation-failure-wf",
+		Status: StatusActive,
+		Trigger: Trigger{
+			Type: TriggerWebhook,
+			Config: map[string]interface{}{
+				"initial_step": "step1",
+			},
+		},
+		Steps: []Step{
+			{
+				ID:     "step1",
+				Action: "logger.info",
+				Params: map[string]interface{}{}, // missing required "message" param
+			},
+		},
+	}
+
+	executor := NewExecutor(wf, connectors.Registry)
+	ctx := context.Background()
+	_, err := executor.executeStep(ctx, &wf.Steps[0], ExecutionContext{})
+	if err == nil {
+		t.Fatal("expected error when parameter validation fails, got nil")
+	}
+	if !strings.Contains(err.Error(), "parameter validation failed") {
+		t.Errorf("expected 'parameter validation failed' error, got: %v", err)
+	}
+}
+
+func TestExecutor_ExecuteStep_ConnectorValidationSuccess(t *testing.T) {
+	wf := &Workflow{
+		ID:     "validation-success-wf",
+		Status: StatusActive,
+		Trigger: Trigger{
+			Type: TriggerWebhook,
+			Config: map[string]interface{}{
+				"initial_step": "step1",
+			},
+		},
+		Steps: []Step{
+			{
+				ID:      "step1",
+				Action:  "logger.info",
+				Retries: 1,
+				Params: map[string]interface{}{
+					"message": "valid message",
+				},
+			},
+		},
+	}
+
+	executor := NewExecutor(wf, connectors.Registry)
+	ctx := context.Background()
+	_, err := executor.executeStep(ctx, &wf.Steps[0], ExecutionContext{})
+	if err != nil {
+		t.Fatalf("unexpected error when validation succeeds: %v", err)
+	}
+}
