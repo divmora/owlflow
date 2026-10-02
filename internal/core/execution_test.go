@@ -344,3 +344,124 @@ func TestExecutor_ExecuteStep_RetriesZeroSuccess(t *testing.T) {
 		t.Fatalf("unexpected error when executing step with retries=0: %v", err)
 	}
 }
+
+type slowTestConnector struct {
+	delay time.Duration
+}
+
+func (s *slowTestConnector) Execute(action string, params map[string]interface{}) (interface{}, error) {
+	time.Sleep(s.delay)
+	return map[string]interface{}{"status": "completed"}, nil
+}
+
+func (s *slowTestConnector) Validate(params map[string]interface{}) error {
+	return nil
+}
+
+func TestExecutor_ExecuteStep_TimeoutExceeded(t *testing.T) {
+	wf := &Workflow{
+		ID:     "timeout-wf",
+		Status: StatusActive,
+		Trigger: Trigger{
+			Type: TriggerWebhook,
+			Config: map[string]interface{}{
+				"initial_step": "step1",
+			},
+		},
+		Steps: []Step{
+			{
+				ID:      "step1",
+				Action:  "slow.run",
+				Timeout: 1, // 1 second timeout
+				Params:  map[string]interface{}{},
+			},
+		},
+	}
+
+	testRegistry := map[string]connectors.Connector{
+		"slow": &slowTestConnector{delay: 3 * time.Second},
+	}
+
+	executor := NewExecutor(wf, testRegistry)
+	start := time.Now()
+	_, err := executor.executeStep(context.Background(), &wf.Steps[0], ExecutionContext{})
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected error due to step timeout, got nil")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected context.DeadlineExceeded in error chain, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "timed out after 1s") {
+		t.Errorf("expected error message to mention 'timed out after 1s', got: %v", err)
+	}
+	if elapsed > 2*time.Second {
+		t.Fatalf("expected step to abort around 1s, took %v", elapsed)
+	}
+}
+
+func TestExecutor_ExecuteStep_WithinTimeout(t *testing.T) {
+	wf := &Workflow{
+		ID:     "within-timeout-wf",
+		Status: StatusActive,
+		Trigger: Trigger{
+			Type: TriggerWebhook,
+			Config: map[string]interface{}{
+				"initial_step": "step1",
+			},
+		},
+		Steps: []Step{
+			{
+				ID:      "step1",
+				Action:  "slow.run",
+				Timeout: 5, // 5 second timeout
+				Params:  map[string]interface{}{},
+			},
+		},
+	}
+
+	testRegistry := map[string]connectors.Connector{
+		"slow": &slowTestConnector{delay: 10 * time.Millisecond},
+	}
+
+	executor := NewExecutor(wf, testRegistry)
+	output, err := executor.executeStep(context.Background(), &wf.Steps[0], ExecutionContext{})
+	if err != nil {
+		t.Fatalf("unexpected error when step completes within timeout: %v", err)
+	}
+	resMap, ok := output.(map[string]interface{})
+	if !ok || resMap["status"] != "completed" {
+		t.Fatalf("unexpected output: %v", output)
+	}
+}
+
+func TestRetry_TimeoutDuringBackoff(t *testing.T) {
+	step := &Step{
+		ID:      "step-timeout-backoff",
+		Timeout: 1,
+		Retries: 3,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 80*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	err := retryWithBackoff(ctx, step, 500*time.Millisecond, func() error {
+		return errors.New("initial failure")
+	})
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected error when timeout fires during backoff, got nil")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected context.DeadlineExceeded in error chain, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "timed out after 1s during retry backoff") {
+		t.Errorf("expected error message to mention timeout during backoff, got: %v", err)
+	}
+	if elapsed > 300*time.Millisecond {
+		t.Fatalf("expected retry loop to abort around 80ms, but took %v", elapsed)
+	}
+}

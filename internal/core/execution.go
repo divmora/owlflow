@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -178,6 +179,14 @@ func (e *Executor) executeStep(ctx context.Context, step *Step, execData Executi
 	if step == nil {
 		return nil, fmt.Errorf("step cannot be nil")
 	}
+
+	stepCtx := ctx
+	if step.Timeout > 0 {
+		var cancel context.CancelFunc
+		stepCtx, cancel = context.WithTimeout(ctx, time.Duration(step.Timeout)*time.Second)
+		defer cancel()
+	}
+
 	log.Printf("[Executor] Executing step '%s' (action: %s)", step.ID, step.Action)
 	// Resolve parameters with templating
 	params, err := resolveParams(step.Params, execData)
@@ -204,7 +213,7 @@ func (e *Executor) executeStep(ctx context.Context, step *Step, execData Executi
 
 	// Execute with retries
 	var output interface{}
-	err = retryWithContext(ctx, step, func() error {
+	err = retryWithContext(stepCtx, step, func() error {
 		result, err := connector.Execute(parts[1], params)
 		if err != nil {
 			log.Printf("[Executor] Error executing step '%s': %v", step.ID, err)
@@ -251,13 +260,43 @@ func retryWithBackoff(ctx context.Context, step *Step, initialBackoff time.Durat
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if err := ctx.Err(); err != nil {
+			if errors.Is(err, context.DeadlineExceeded) && step.Timeout > 0 {
+				if lastErr != nil {
+					return fmt.Errorf("step '%s' timed out after %ds: %w (last error: %v)", step.ID, step.Timeout, err, lastErr)
+				}
+				return fmt.Errorf("step '%s' timed out after %ds: %w", step.ID, step.Timeout, err)
+			}
 			if lastErr != nil {
 				return fmt.Errorf("context cancelled during retry: %w (last error: %v)", err, lastErr)
 			}
 			return err
 		}
 
-		lastErr = fn()
+		if ctx.Done() != nil {
+			done := make(chan error, 1)
+			go func() {
+				done <- fn()
+			}()
+
+			select {
+			case <-ctx.Done():
+				if errors.Is(ctx.Err(), context.DeadlineExceeded) && step.Timeout > 0 {
+					if lastErr != nil {
+						return fmt.Errorf("step '%s' timed out after %ds: %w (last error: %v)", step.ID, step.Timeout, ctx.Err(), lastErr)
+					}
+					return fmt.Errorf("step '%s' timed out after %ds: %w", step.ID, step.Timeout, ctx.Err())
+				}
+				if lastErr != nil {
+					return fmt.Errorf("context cancelled during step execution: %w (last error: %v)", ctx.Err(), lastErr)
+				}
+				return ctx.Err()
+			case err := <-done:
+				lastErr = err
+			}
+		} else {
+			lastErr = fn()
+		}
+
 		if lastErr == nil {
 			return nil
 		}
@@ -265,6 +304,9 @@ func retryWithBackoff(ctx context.Context, step *Step, initialBackoff time.Durat
 		if attempt < maxRetries {
 			select {
 			case <-ctx.Done():
+				if errors.Is(ctx.Err(), context.DeadlineExceeded) && step.Timeout > 0 {
+					return fmt.Errorf("step '%s' timed out after %ds during retry backoff: %w (last error: %v)", step.ID, step.Timeout, ctx.Err(), lastErr)
+				}
 				return fmt.Errorf("context cancelled during backoff: %w (last error: %v)", ctx.Err(), lastErr)
 			case <-time.After(backoff):
 			}

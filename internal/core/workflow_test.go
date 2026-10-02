@@ -202,3 +202,31 @@ func TestWorkflowValidate_InvalidNextStepReference(t *testing.T) {
 		t.Errorf("expected 'references invalid next step' error, got: %v", err)
 	}
 }
+
+func TestWorkflowValidate_NegativeTimeout(t *testing.T) {
+	wf := &Workflow{
+		ID:     "negative-timeout-wf",
+		Status: StatusActive,
+		Trigger: Trigger{
+			Type: TriggerWebhook,
+			Config: map[string]interface{}{
+				"initial_step": "step1",
+			},
+		},
+		Steps: []Step{
+			{
+				ID:      "step1",
+				Action:  "logger.info",
+				Timeout: -5,
+			},
+		},
+	}
+
+	err := wf.Validate()
+	if err == nil {
+		t.Fatal("expected error for negative timeout, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid negative timeout: -5") {
+		t.Errorf("expected negative timeout error, got: %v", err)
+	}
+}
