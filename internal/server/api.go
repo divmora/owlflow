@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -8,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/url"
 	"os"
@@ -231,6 +233,27 @@ func (a *API) loadWorkflowByID(id string) (*core.Workflow, error) {
 	return &wf, nil
 }
 
+// getRequestBody retrieves the HTTP request body bytes, caching them in the Gin context
+// and resetting c.Request.Body so that subsequent reads within the request lifecycle succeed.
+func (a *API) getRequestBody(c *gin.Context) ([]byte, error) {
+	if cached, exists := c.Get("raw_body"); exists {
+		if body, ok := cached.([]byte); ok {
+			return body, nil
+		}
+	}
+
+	body, err := c.GetRawData()
+	if err != nil {
+		return nil, err
+	}
+
+	c.Set("raw_body", body)
+	if c.Request != nil {
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+	}
+	return body, nil
+}
+
 func (a *API) verifyWebhook(c *gin.Context, wf *core.Workflow) error {
 	secret, ok := wf.Trigger.Config["secret"].(string)
 	if !ok || secret == "" {
@@ -252,8 +275,8 @@ func (a *API) verifyWebhook(c *gin.Context, wf *core.Workflow) error {
 		return fmt.Errorf("missing signature")
 	}
 
-	// Read raw body
-	body, err := c.GetRawData()
+	// Read raw body (cached for subsequent parsing)
+	body, err := a.getRequestBody(c)
 	if err != nil {
 		return fmt.Errorf("failed to read body")
 	}
@@ -274,13 +297,17 @@ func (a *API) verifyWebhook(c *gin.Context, wf *core.Workflow) error {
 func (a *API) parseWebhookPayload(c *gin.Context) (interface{}, error) {
 	contentType := c.GetHeader("Content-Type")
 
-	// Read raw body again after verification
-	body, err := c.GetRawData()
+	// Read raw body (retrieves cached body if already read during verification)
+	body, err := a.getRequestBody(c)
 	if err != nil {
 		return nil, err
 	}
 
 	log.Printf("[Webhook Payload Log] ContentType: %s, Body: %s", contentType, string(body))
+
+	if len(body) == 0 {
+		return nil, nil
+	}
 
 	switch {
 	case strings.Contains(contentType, "application/json"):
