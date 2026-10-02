@@ -151,7 +151,7 @@ steps:
 | :--- | :--- | :---: | :--- |
 | `id` | `string` | _Required_ | Unique identifier for the step within this workflow. |
 | `action` | `string` | _Required_ | Action identifier in `<connector>.<action>` format (e.g. `http.get`, `jira.transition_issue`). |
-| `retries` | `int` | `1` | Number of retry attempts upon connector failure. Retries use exponential backoff (`1s`, `2s`, `4s`, ...). |
+| `retries` | `int` | `0` | Number of retry attempts upon connector failure. Retries use exponential backoff (`1s`, `2s`, `4s`, ...). Default is `0` (no retries). |
 | `timeout` | `int` | `0` | Execution timeout in seconds. |
 | `pass_output` | `bool` | `false` | When true, output is preserved in `ParentOutputs`. Step output is always recorded in `{{ .steps.<id>.output }}` regardless of this setting. |
 | `params` | `map` | `{}` | Parameter values passed to the connector. Values support Go templating strings. |

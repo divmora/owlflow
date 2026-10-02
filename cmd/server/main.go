@@ -115,12 +115,6 @@ func loadWorkflowsFromFS() []*core.Workflow {
 		wf.StepsMap = make(map[string]*core.Step)
 		for i := range wf.Steps {
 			step := &wf.Steps[i]
-
-			// Set default retries if not specified
-			if step.Retries == 0 {
-				step.Retries = 1
-			}
-
 			wf.StepsMap[step.ID] = step
 		}
 
