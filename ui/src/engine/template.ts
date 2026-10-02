@@ -81,7 +81,7 @@ export const TEMPLATE_FUNCTIONS: Record<string, (...args: any[]) => any> = {
     };
     const s1 = String(arg1 ?? '');
     const s2 = String(arg2 ?? '');
-    return testPattern(s1, s2) || testPattern(s2, s1);
+    return testPattern(s1, s2);
   },
 
   matches: (arg1: any, arg2: any): boolean => {
