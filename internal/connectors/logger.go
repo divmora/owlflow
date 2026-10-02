@@ -64,7 +64,9 @@ func (l *LoggerConnector) Execute(action string, params map[string]interface{}) 
 
 	// Add workflow ID if available
 	if wf, exists := params["__workflow_id"]; exists {
-		entry.Workflow = wf.(string)
+		if wfStr, ok := wf.(string); ok {
+			entry.Workflow = wfStr
+		}
 	}
 
 	// Generate JSON output

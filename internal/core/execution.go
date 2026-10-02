@@ -196,6 +196,12 @@ func (e *Executor) executeStep(ctx context.Context, step *Step, execData Executi
 		return nil, fmt.Errorf("connector '%s' not found", parts[0])
 	}
 
+	// Validate parameters with connector
+	if err := connector.Validate(params); err != nil {
+		log.Printf("[Executor] Parameter validation failed for step '%s': %v", step.ID, err)
+		return nil, fmt.Errorf("parameter validation failed: %w", err)
+	}
+
 	// Execute with retries
 	var output interface{}
 	err = retry(step, func() error {
