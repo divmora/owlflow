@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -307,5 +308,172 @@ func TestHealthCheckEndpoints(t *testing.T) {
 				t.Errorf("expected body to contain '%s':'%s', got: %s", ep.expectedKey, ep.expectedVal, w.Body.String())
 			}
 		})
+	}
+}
+
+func TestHandleWebhook_HMACAuthenticationAndDoubleRead(t *testing.T) {
+	dir := setupTestWorkflowDir(t)
+
+	api := NewAPI()
+	api.WorkflowConfigPath = dir
+	router := api.SetupRouter()
+
+	secret := "supersecret123"
+
+	calcHMAC := func(payload string) string {
+		mac := hmac.New(sha256.New, []byte(secret))
+		mac.Write([]byte(payload))
+		return fmt.Sprintf("sha256=%s", hex.EncodeToString(mac.Sum(nil)))
+	}
+
+	t.Run("Valid HMAC authenticated JSON webhook succeeds (resolves double-read issue)", func(t *testing.T) {
+		payload := `{"event":"push","ref":"refs/heads/main"}`
+		sig := calcHMAC(payload)
+
+		req := httptest.NewRequest(http.MethodPost, "/webhook/active-wf", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Hub-Signature-256", sig)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusAccepted {
+			t.Fatalf("expected HTTP 202 Accepted, got %d. Body: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), `"status":"accepted"`) {
+			t.Errorf("expected response to contain '\"status\":\"accepted\"', got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("Valid HMAC authenticated webhook executes synchronously in AWS Lambda environment", func(t *testing.T) {
+		t.Setenv("AWS_LAMBDA_FUNCTION_NAME", "owlflow-lambda-test")
+
+		payload := `{"event":"lambda_trigger","action":"deploy"}`
+		sig := calcHMAC(payload)
+
+		req := httptest.NewRequest(http.MethodPost, "/webhook/active-wf", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Hub-Signature-256", sig)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected HTTP 200 OK in Lambda environment, got %d. Body: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), `"status":"completed"`) {
+			t.Errorf("expected response to contain '\"status\":\"completed\"', got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("Valid HMAC authenticated form-urlencoded webhook succeeds", func(t *testing.T) {
+		payload := "user=alice&action=login"
+		sig := calcHMAC(payload)
+
+		req := httptest.NewRequest(http.MethodPost, "/webhook/active-wf", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("X-Hub-Signature-256", sig)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusAccepted {
+			t.Fatalf("expected HTTP 202 Accepted, got %d. Body: %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("Valid HMAC authenticated raw text webhook succeeds", func(t *testing.T) {
+		payload := "plain text raw payload"
+		sig := calcHMAC(payload)
+
+		req := httptest.NewRequest(http.MethodPost, "/webhook/active-wf", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "text/plain")
+		req.Header.Set("X-Hub-Signature-256", sig)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusAccepted {
+			t.Fatalf("expected HTTP 202 Accepted, got %d. Body: %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("Missing HMAC signature returns 401 Unauthorized", func(t *testing.T) {
+		payload := `{"event":"push"}`
+
+		req := httptest.NewRequest(http.MethodPost, "/webhook/active-wf", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("expected HTTP 401 Unauthorized for missing signature, got %d. Body: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), "missing signature") {
+			t.Errorf("expected 'missing signature' error, got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("Invalid HMAC signature returns 401 Unauthorized", func(t *testing.T) {
+		payload := `{"event":"push"}`
+
+		req := httptest.NewRequest(http.MethodPost, "/webhook/active-wf", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Hub-Signature-256", "sha256=badsignature")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Fatalf("expected HTTP 401 Unauthorized for invalid signature, got %d. Body: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), "invalid signature") {
+			t.Errorf("expected 'invalid signature' error, got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("Empty body is handled gracefully without error", func(t *testing.T) {
+		payload := ""
+		sig := calcHMAC(payload)
+
+		req := httptest.NewRequest(http.MethodPost, "/webhook/active-wf", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Hub-Signature-256", sig)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusAccepted {
+			t.Fatalf("expected HTTP 202 Accepted, got %d. Body: %s", w.Code, w.Body.String())
+		}
+	})
+}
+
+func TestGetRequestBody_CachingAndRewind(t *testing.T) {
+	api := NewAPI()
+	bodyContent := `{"test":"caching"}`
+
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(bodyContent))
+
+	// First read
+	first, err := api.getRequestBody(c)
+	if err != nil {
+		t.Fatalf("unexpected error on first read: %v", err)
+	}
+	if string(first) != bodyContent {
+		t.Fatalf("expected '%s', got '%s'", bodyContent, string(first))
+	}
+
+	// Second read (from cache)
+	second, err := api.getRequestBody(c)
+	if err != nil {
+		t.Fatalf("unexpected error on second read: %v", err)
+	}
+	if string(second) != bodyContent {
+		t.Fatalf("expected '%s', got '%s'", bodyContent, string(second))
+	}
+
+	// Verify c.Request.Body was rewound and can still be read directly
+	readDirect, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		t.Fatalf("unexpected error reading rewound request body: %v", err)
+	}
+	if string(readDirect) != bodyContent {
+		t.Fatalf("expected '%s' from direct body read, got '%s'", bodyContent, string(readDirect))
 	}
 }
