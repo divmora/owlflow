@@ -49,8 +49,8 @@ func evalSimpleExpr(expr string) bool {
 	}
 
 	// Handle OR
-	if strings.Contains(expr, " || ") {
-		parts := strings.Split(expr, " || ")
+	parts := splitOutsideQuotes(expr, " || ")
+	if len(parts) > 1 {
 		for _, part := range parts {
 			if evalSimpleExpr(part) {
 				return true
@@ -60,8 +60,8 @@ func evalSimpleExpr(expr string) bool {
 	}
 
 	// Handle AND
-	if strings.Contains(expr, " && ") {
-		parts := strings.Split(expr, " && ")
+	parts = splitOutsideQuotes(expr, " && ")
+	if len(parts) > 1 {
 		for _, part := range parts {
 			if !evalSimpleExpr(part) {
 				return false
@@ -71,60 +71,48 @@ func evalSimpleExpr(expr string) bool {
 	}
 
 	// Handle Equality
-	if strings.Contains(expr, " == ") {
-		parts := strings.Split(expr, " == ")
-		if len(parts) == 2 {
-			return normalizeExprValue(parts[0]) == normalizeExprValue(parts[1])
-		}
+	parts = splitOutsideQuotes(expr, " == ")
+	if len(parts) == 2 {
+		return normalizeExprValue(parts[0]) == normalizeExprValue(parts[1])
 	}
 
 	// Handle Inequality
-	if strings.Contains(expr, " != ") {
-		parts := strings.Split(expr, " != ")
-		if len(parts) == 2 {
-			return normalizeExprValue(parts[0]) != normalizeExprValue(parts[1])
-		}
+	parts = splitOutsideQuotes(expr, " != ")
+	if len(parts) == 2 {
+		return normalizeExprValue(parts[0]) != normalizeExprValue(parts[1])
 	}
 
 	// Handle Relational operators (<=, >=, <, >)
-	if strings.Contains(expr, " <= ") {
-		parts := strings.Split(expr, " <= ")
-		if len(parts) == 2 {
-			v1, err1 := strconv.ParseFloat(normalizeExprValue(parts[0]), 64)
-			v2, err2 := strconv.ParseFloat(normalizeExprValue(parts[1]), 64)
-			if err1 == nil && err2 == nil {
-				return v1 <= v2
-			}
+	parts = splitOutsideQuotes(expr, " <= ")
+	if len(parts) == 2 {
+		v1, err1 := strconv.ParseFloat(normalizeExprValue(parts[0]), 64)
+		v2, err2 := strconv.ParseFloat(normalizeExprValue(parts[1]), 64)
+		if err1 == nil && err2 == nil {
+			return v1 <= v2
 		}
 	}
-	if strings.Contains(expr, " >= ") {
-		parts := strings.Split(expr, " >= ")
-		if len(parts) == 2 {
-			v1, err1 := strconv.ParseFloat(normalizeExprValue(parts[0]), 64)
-			v2, err2 := strconv.ParseFloat(normalizeExprValue(parts[1]), 64)
-			if err1 == nil && err2 == nil {
-				return v1 >= v2
-			}
+	parts = splitOutsideQuotes(expr, " >= ")
+	if len(parts) == 2 {
+		v1, err1 := strconv.ParseFloat(normalizeExprValue(parts[0]), 64)
+		v2, err2 := strconv.ParseFloat(normalizeExprValue(parts[1]), 64)
+		if err1 == nil && err2 == nil {
+			return v1 >= v2
 		}
 	}
-	if strings.Contains(expr, " < ") {
-		parts := strings.Split(expr, " < ")
-		if len(parts) == 2 {
-			v1, err1 := strconv.ParseFloat(normalizeExprValue(parts[0]), 64)
-			v2, err2 := strconv.ParseFloat(normalizeExprValue(parts[1]), 64)
-			if err1 == nil && err2 == nil {
-				return v1 < v2
-			}
+	parts = splitOutsideQuotes(expr, " < ")
+	if len(parts) == 2 {
+		v1, err1 := strconv.ParseFloat(normalizeExprValue(parts[0]), 64)
+		v2, err2 := strconv.ParseFloat(normalizeExprValue(parts[1]), 64)
+		if err1 == nil && err2 == nil {
+			return v1 < v2
 		}
 	}
-	if strings.Contains(expr, " > ") {
-		parts := strings.Split(expr, " > ")
-		if len(parts) == 2 {
-			v1, err1 := strconv.ParseFloat(normalizeExprValue(parts[0]), 64)
-			v2, err2 := strconv.ParseFloat(normalizeExprValue(parts[1]), 64)
-			if err1 == nil && err2 == nil {
-				return v1 > v2
-			}
+	parts = splitOutsideQuotes(expr, " > ")
+	if len(parts) == 2 {
+		v1, err1 := strconv.ParseFloat(normalizeExprValue(parts[0]), 64)
+		v2, err2 := strconv.ParseFloat(normalizeExprValue(parts[1]), 64)
+		if err1 == nil && err2 == nil {
+			return v1 > v2
 		}
 	}
 
@@ -137,17 +125,21 @@ func evalSimpleExpr(expr string) bool {
 	if strings.HasPrefix(expr, "hasPrefix ") || strings.HasPrefix(expr, "hasPrefix(") {
 		if strings.HasPrefix(expr, "hasPrefix(") && strings.HasSuffix(expr, ")") {
 			inner := strings.TrimSuffix(strings.TrimPrefix(expr, "hasPrefix("), ")")
-			parts := strings.SplitN(inner, ",", 2)
+			parts := splitOutsideQuotes(inner, ",")
 			if len(parts) == 2 {
 				item := normalizeExprValue(parts[0])
 				prefix := normalizeExprValue(parts[1])
 				return strings.HasPrefix(item, prefix)
 			}
 		} else {
-			parts := strings.SplitN(expr, " ", 3)
+			parts := splitWhitespaceOutsideQuotes(expr)
 			if len(parts) == 3 {
 				item := normalizeExprValue(parts[1])
 				prefix := normalizeExprValue(parts[2])
+				return strings.HasPrefix(item, prefix)
+			} else if len(parts) > 3 {
+				item := normalizeExprValue(parts[1])
+				prefix := normalizeExprValue(strings.Join(parts[2:], " "))
 				return strings.HasPrefix(item, prefix)
 			}
 		}
@@ -160,17 +152,21 @@ func evalSimpleExpr(expr string) bool {
 		if strings.HasPrefix(expr, prefixSpace) || strings.HasPrefix(expr, prefixParen) {
 			if strings.HasPrefix(expr, prefixParen) && strings.HasSuffix(expr, ")") {
 				inner := strings.TrimSuffix(strings.TrimPrefix(expr, prefixParen), ")")
-				parts := strings.SplitN(inner, ",", 2)
+				parts := splitOutsideQuotes(inner, ",")
 				if len(parts) == 2 {
 					item := normalizeExprValue(parts[0])
 					pattern := normalizeExprValue(parts[1])
 					return matchRegex(item, pattern)
 				}
 			} else {
-				parts := strings.SplitN(expr, " ", 3)
+				parts := splitWhitespaceOutsideQuotes(expr)
 				if len(parts) == 3 {
 					item := normalizeExprValue(parts[1])
 					pattern := normalizeExprValue(parts[2])
+					return matchRegex(item, pattern)
+				} else if len(parts) > 3 {
+					item := normalizeExprValue(parts[1])
+					pattern := normalizeExprValue(strings.Join(parts[2:], " "))
 					return matchRegex(item, pattern)
 				}
 			}
@@ -184,8 +180,9 @@ func evalSimpleExpr(expr string) bool {
 
 func parseRegexPattern(pattern string) (string, error) {
 	pattern = strings.TrimSpace(pattern)
-	pattern = strings.Trim(pattern, "\"")
-	pattern = strings.Trim(pattern, "'")
+	if ok, _ := isQuoted(pattern); ok {
+		pattern = pattern[1 : len(pattern)-1]
+	}
 	pattern = strings.TrimSpace(pattern)
 
 	// Check for JS-style regex literal: /pattern/flags
@@ -243,10 +240,133 @@ func matchRegex(item, pattern string) bool {
 	return matched
 }
 
+// isQuoted returns true and the quote character if s is enclosed by matching unescaped double or single quotes.
+func isQuoted(s string) (bool, byte) {
+	if len(s) < 2 {
+		return false, 0
+	}
+	quote := s[0]
+	if quote != '"' && quote != '\'' {
+		return false, 0
+	}
+	escaped := false
+	for i := 1; i < len(s); i++ {
+		c := s[i]
+		if escaped {
+			escaped = false
+			continue
+		}
+		if c == '\\' {
+			escaped = true
+			continue
+		}
+		if c == quote {
+			if i == len(s)-1 {
+				return true, quote
+			}
+			return false, 0
+		}
+	}
+	return false, 0
+}
+
+// splitOutsideQuotes splits s by sep only where sep occurs outside single or double quotes.
+func splitOutsideQuotes(s, sep string) []string {
+	if sep == "" || len(s) < len(sep) {
+		return []string{s}
+	}
+	var parts []string
+	var quote byte
+	escaped := false
+	start := 0
+	sepLen := len(sep)
+
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if escaped {
+			escaped = false
+			continue
+		}
+		if c == '\\' {
+			escaped = true
+			continue
+		}
+		if quote != 0 {
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		if c == '"' || c == '\'' {
+			quote = c
+			continue
+		}
+		if i+sepLen <= len(s) && s[i:i+sepLen] == sep {
+			parts = append(parts, s[start:i])
+			start = i + sepLen
+			i += sepLen - 1
+		}
+	}
+	parts = append(parts, s[start:])
+	return parts
+}
+
+// splitWhitespaceOutsideQuotes splits s by whitespace outside single or double quotes.
+func splitWhitespaceOutsideQuotes(s string) []string {
+	var tokens []string
+	var quote byte
+	escaped := false
+	start := -1
+
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if escaped {
+			escaped = false
+			continue
+		}
+		if c == '\\' {
+			escaped = true
+			continue
+		}
+		if quote != 0 {
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		if c == '"' || c == '\'' {
+			quote = c
+			if start == -1 {
+				start = i
+			}
+			continue
+		}
+		if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
+			if start != -1 {
+				tokens = append(tokens, s[start:i])
+				start = -1
+			}
+		} else {
+			if start == -1 {
+				start = i
+			}
+		}
+	}
+	if start != -1 {
+		tokens = append(tokens, s[start:])
+	}
+	return tokens
+}
+
 func normalizeExprValue(s string) string {
 	s = strings.TrimSpace(s)
-	s = strings.Trim(s, "\"")
-	s = strings.Trim(s, "'")
+	if ok, quote := isQuoted(s); ok {
+		inner := s[1 : len(s)-1]
+		if quote == '"' {
+			return strings.ReplaceAll(inner, `\"`, `"`)
+		}
+		return strings.ReplaceAll(inner, `\'`, `'`)
+	}
 	return s
 }
 

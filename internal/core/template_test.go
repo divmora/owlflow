@@ -224,6 +224,10 @@ func TestTemplateExecution_Integration(t *testing.T) {
 		{"first element", `{{ first .items }}`, "item0"},
 		{"map index", `{{ index .dict "title" }}`, "OwlFlow"},
 		{"toJson", `{{ toJson .items }}`, `["item0","item1","item2"]`},
+		{"regexMatch true", `{{ regexMatch "foo123bar" "foo.*bar" }}`, "true"},
+		{"regexMatch false no operand swap", `{{ regexMatch "foo.*bar" "foo123bar" }}`, "false"},
+		{"matches alias true", `{{ matches "feature/login" "^feature/" }}`, "true"},
+		{"matches alias false no operand swap", `{{ matches "^feature/" "feature/login" }}`, "false"},
 	}
 
 	for _, tc := range testCases {
@@ -240,5 +244,50 @@ func TestTemplateExecution_Integration(t *testing.T) {
 				t.Errorf("expected %q, got %q", tc.expected, buf.String())
 			}
 		})
+	}
+}
+
+func TestTemplateRegexMatch_DeterministicOperandOrder(t *testing.T) {
+	// Issue #25:
+	// If item is "foo.*bar" and pattern is "foo123bar":
+	// "foo123bar" as a regex does NOT match "foo.*bar" -> must return false.
+	// Previously, the engine swapped arguments and compiled "foo.*bar" as a regex against "foo123bar",
+	// returning true (a false positive).
+	matched, err := templateRegexMatch("foo.*bar", "foo123bar")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if matched {
+		t.Errorf("expected false when item contains regex metacharacters and pattern is literal, got true (reversed operands)")
+	}
+
+	// Correct match: item is "foo123bar" and pattern is "foo.*bar" -> true
+	matched, err = templateRegexMatch("foo123bar", "foo.*bar")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !matched {
+		t.Errorf("expected true when item matches pattern, got false")
+	}
+
+	// item has \d+ and pattern is 123
+	matched, err = templateRegexMatch(`\d+`, "123")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if matched {
+		t.Errorf("expected false when item is `\\d+` and pattern is '123', got true")
+	}
+}
+
+func TestTemplateRegexMatch_ArgumentCount(t *testing.T) {
+	_, err := templateRegexMatch()
+	if err == nil {
+		t.Errorf("expected error for 0 arguments, got nil")
+	}
+
+	_, err = templateRegexMatch("only_one_arg")
+	if err == nil {
+		t.Errorf("expected error for 1 argument, got nil")
 	}
 }

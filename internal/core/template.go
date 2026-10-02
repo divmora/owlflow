@@ -25,16 +25,10 @@ func templateRegexMatch(args ...interface{}) (bool, error) {
 	if len(args) < 2 {
 		return false, fmt.Errorf("regexMatch requires 2 arguments (item and regex)")
 	}
-	s1 := fmt.Sprintf("%v", args[0])
-	s2 := fmt.Sprintf("%v", args[1])
+	item := fmt.Sprintf("%v", args[0])
+	pattern := fmt.Sprintf("%v", args[1])
 
-	if matchRegex(s1, s2) {
-		return true, nil
-	}
-	if matchRegex(s2, s1) {
-		return true, nil
-	}
-	return false, nil
+	return matchRegex(item, pattern), nil
 }
 
 func toJson(data interface{}) (string, error) {
