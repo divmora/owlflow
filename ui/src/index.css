@@ -1,6 +1,18 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-owl-50: #f0f9ff;
+  --color-owl-100: #e0f2fe;
+  --color-owl-200: #bae6fd;
+  --color-owl-300: #7dd3fc;
+  --color-owl-400: #38bdf8;
+  --color-owl-500: #0ea5e9;
+  --color-owl-600: #0284c7;
+  --color-owl-700: #0369a1;
+  --color-owl-800: #075985;
+  --color-owl-900: #0c4a6e;
+  --color-owl-950: #082f49;
+}
 
 @layer base {
   * {
