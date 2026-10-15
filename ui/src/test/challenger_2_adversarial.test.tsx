@@ -25,8 +25,8 @@ Object.assign(navigator, {
 });
 
 // Mock URL.createObjectURL and URL.revokeObjectURL for downloads
-global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
-global.URL.revokeObjectURL = vi.fn();
+globalThis.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
+globalThis.URL.revokeObjectURL = vi.fn();
 
 // Mock window.confirm
 vi.spyOn(window, 'confirm').mockImplementation(() => true);
@@ -571,8 +571,8 @@ describe('Challenger 2: UI & Workflows Adversarial Verification Suite', () => {
       const downloadBtn = screen.getByText('Download File');
       fireEvent.click(downloadBtn);
 
-      expect(global.URL.createObjectURL).toHaveBeenCalled();
-      expect(global.URL.revokeObjectURL).toHaveBeenCalled();
+      expect(globalThis.URL.createObjectURL).toHaveBeenCalled();
+      expect(globalThis.URL.revokeObjectURL).toHaveBeenCalled();
     });
   });
 
