@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/divmora/owlflow/compare/v0.3.0...v0.3.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* **ui:** use globalThis in tests to satisfy tsc ([19aac82](https://github.com/divmora/owlflow/commit/19aac828ffcd82d1a7de67e5a4c4bd1ce8d116e0))
+
 ## [0.3.0](https://github.com/divmora/owlflow/compare/v0.2.0...v0.3.0) (2026-10-05)
 
 
