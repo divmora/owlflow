@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -24,6 +25,7 @@ import (
 	"github.com/divmora/owlflow/internal/core"
 	"github.com/divmora/owlflow/internal/logging"
 	"github.com/divmora/owlflow/internal/metrics"
+	"github.com/divmora/owlflow/pkg/version"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -41,6 +43,7 @@ type API struct {
 	Workflows          map[string]*core.Workflow
 	Connectors         map[string]connectors.Connector
 	WorkflowConfigPath string
+	StartTime          time.Time
 }
 
 func NewAPI() *API {
@@ -53,6 +56,7 @@ func NewAPI() *API {
 		Workflows:          make(map[string]*core.Workflow),
 		Connectors:         connectors.Registry,
 		WorkflowConfigPath: configPath,
+		StartTime:          time.Now().UTC(),
 	}
 }
 
@@ -65,10 +69,13 @@ func (a *API) SetupRouter() *gin.Engine {
 	r := gin.Default()
 	r.Use(metrics.Middleware())
 
-	// Kubernetes and container health probes
+	// Kubernetes and container health probes (GET and HEAD for load balancer healthchecks)
 	r.GET("/healthz", a.handleHealthz)
+	r.HEAD("/healthz", a.handleHealthz)
 	r.GET("/readyz", a.handleReadyz)
+	r.HEAD("/readyz", a.handleReadyz)
 	r.GET("/health", a.handleHealthz)
+	r.HEAD("/health", a.handleHealthz)
 
 	// Prometheus metrics
 	r.GET("/metrics", a.handleMetrics)
@@ -84,16 +91,74 @@ func (a *API) handleMetrics(c *gin.Context) {
 }
 
 func (a *API) handleHealthz(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"status": "ok",
-		"time":   time.Now().UTC().Format(time.RFC3339),
+	var uptime float64
+	if !a.StartTime.IsZero() {
+		uptime = time.Since(a.StartTime).Seconds()
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"status":         "ok",
+		"time":           time.Now().UTC().Format(time.RFC3339),
+		"uptime_seconds": uptime,
+		"version":        version.Version,
 	})
 }
 
 func (a *API) handleReadyz(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"status": "ready",
-		"time":   time.Now().UTC().Format(time.RFC3339),
+	var uptime float64
+	if !a.StartTime.IsZero() {
+		uptime = time.Since(a.StartTime).Seconds()
+	}
+
+	// 1. Verify workflow configuration path is configured and accessible
+	if a.WorkflowConfigPath == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status":         "not_ready",
+			"error":          "workflow configuration path is not configured",
+			"time":           time.Now().UTC().Format(time.RFC3339),
+			"uptime_seconds": uptime,
+			"version":        version.Version,
+		})
+		return
+	}
+
+	info, err := os.Stat(a.WorkflowConfigPath)
+	if err != nil || !info.IsDir() {
+		errMsg := "directory inaccessible"
+		if err != nil {
+			errMsg = err.Error()
+		} else if !info.IsDir() {
+			errMsg = "configured workflow path is not a directory"
+		}
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status":         "not_ready",
+			"error":          errMsg,
+			"workflows_dir":  a.WorkflowConfigPath,
+			"time":           time.Now().UTC().Format(time.RFC3339),
+			"uptime_seconds": uptime,
+			"version":        version.Version,
+		})
+		return
+	}
+
+	// 2. Verify connectors registry is populated
+	if len(a.Connectors) == 0 {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status":         "not_ready",
+			"error":          "no connectors registered",
+			"time":           time.Now().UTC().Format(time.RFC3339),
+			"uptime_seconds": uptime,
+			"version":        version.Version,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":           "ready",
+		"time":             time.Now().UTC().Format(time.RFC3339),
+		"uptime_seconds":   uptime,
+		"version":          version.Version,
+		"workflows_dir":    a.WorkflowConfigPath,
+		"connectors_count": len(a.Connectors),
 	})
 }
 

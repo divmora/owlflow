@@ -639,7 +639,9 @@ steps:
 }
 
 func TestHealthCheckEndpoints(t *testing.T) {
+	dir := setupTestWorkflowDir(t)
 	api := NewAPI()
+	api.WorkflowConfigPath = dir
 	router := api.SetupRouter()
 
 	endpoints := []struct {
@@ -660,14 +662,83 @@ func TestHealthCheckEndpoints(t *testing.T) {
 			router.ServeHTTP(w, req)
 
 			if w.Code != ep.expectedStatus {
-				t.Errorf("expected HTTP %d, got %d", ep.expectedStatus, w.Code)
+				t.Errorf("expected HTTP %d, got %d. Body: %s", ep.expectedStatus, w.Code, w.Body.String())
 			}
 
 			if !strings.Contains(w.Body.String(), fmt.Sprintf(`"%s":"%s"`, ep.expectedKey, ep.expectedVal)) {
 				t.Errorf("expected body to contain '%s':'%s', got: %s", ep.expectedKey, ep.expectedVal, w.Body.String())
 			}
+
+			if !strings.Contains(w.Body.String(), "uptime_seconds") {
+				t.Errorf("expected body to contain 'uptime_seconds', got: %s", w.Body.String())
+			}
+			if !strings.Contains(w.Body.String(), "version") {
+				t.Errorf("expected body to contain 'version', got: %s", w.Body.String())
+			}
+		})
+
+		t.Run("HEAD "+ep.path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodHead, ep.path, nil)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+
+			if w.Code != ep.expectedStatus {
+				t.Errorf("expected HTTP %d for HEAD, got %d", ep.expectedStatus, w.Code)
+			}
 		})
 	}
+
+	t.Run("GET /readyz returns 503 when workflow config path is invalid", func(t *testing.T) {
+		degradedAPI := NewAPI()
+		degradedAPI.WorkflowConfigPath = "/non/existent/path/for/sure/12345"
+		degradedRouter := degradedAPI.SetupRouter()
+
+		req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+		w := httptest.NewRecorder()
+		degradedRouter.ServeHTTP(w, req)
+
+		if w.Code != http.StatusServiceUnavailable {
+			t.Errorf("expected HTTP 503 for degraded readyz, got %d. Body: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), `"status":"not_ready"`) {
+			t.Errorf("expected body to contain not_ready status, got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("GET /readyz returns 503 when workflow config path is empty", func(t *testing.T) {
+		degradedAPI := NewAPI()
+		degradedAPI.WorkflowConfigPath = ""
+		degradedRouter := degradedAPI.SetupRouter()
+
+		req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+		w := httptest.NewRecorder()
+		degradedRouter.ServeHTTP(w, req)
+
+		if w.Code != http.StatusServiceUnavailable {
+			t.Errorf("expected HTTP 503 for empty path readyz, got %d. Body: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), `"status":"not_ready"`) {
+			t.Errorf("expected body to contain not_ready status, got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("GET /readyz returns 503 when connector registry is empty", func(t *testing.T) {
+		degradedAPI := NewAPI()
+		degradedAPI.WorkflowConfigPath = dir
+		degradedAPI.Connectors = nil
+		degradedRouter := degradedAPI.SetupRouter()
+
+		req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+		w := httptest.NewRecorder()
+		degradedRouter.ServeHTTP(w, req)
+
+		if w.Code != http.StatusServiceUnavailable {
+			t.Errorf("expected HTTP 503 for empty connectors, got %d. Body: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), "no connectors registered") {
+			t.Errorf("expected body to mention no connectors registered, got: %s", w.Body.String())
+		}
+	})
 }
 
 func TestMetricsEndpoint(t *testing.T) {
