@@ -44,7 +44,8 @@ RUN apk update && apk add --no-cache \
     && rm -rf /var/cache/apk/*
 
 # Install AWS Lambda Web Adapter (intercepts Lambda invocations and proxies to HTTP PORT 8080)
-COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.8.4 /lambda-adapter /opt/extensions/lambda-adapter
+# Mirrored to ghcr.io/divmora/owlflow-lambda-adapter to avoid ECR Public unauthenticated rate limits
+COPY --from=ghcr.io/divmora/owlflow-lambda-adapter:0.8.4 /lambda-adapter /opt/extensions/lambda-adapter
 
 WORKDIR /app
 
