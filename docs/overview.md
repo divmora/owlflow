@@ -107,6 +107,15 @@ Transitions between steps in `next_steps` can define conditional expressions. Ex
   ```
 - Connectors support exponential backoff retries per step (`retries: N`).
 
+### 7. Observability & Telemetry (Prometheus)
+- **Native Metrics Endpoint (`GET /metrics`)**:
+  - Exposes runtime Prometheus/OpenMetrics telemetry.
+  - **Workflow Metrics**: `owlflow_workflow_executions_total{workflow_id, status}`, `owlflow_workflow_duration_seconds{workflow_id, status}`.
+  - **Step Metrics**: `owlflow_step_executions_total{workflow_id, step_id, action, status}`, `owlflow_step_duration_seconds{workflow_id, step_id, action}`.
+  - **HTTP Metrics**: `owlflow_http_requests_total{method, path, status}`, `owlflow_http_request_duration_seconds{method, path}`.
+  - Standard Go runtime and GC metrics (`go_goroutines`, `go_memstats_*`, etc.).
+  - Preserves low cardinality using Gin route templates (`/webhook/:id`).
+
 ---
 
 ## Execution Lifecycle Example

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/divmora/owlflow/internal/connectors"
+	"github.com/divmora/owlflow/internal/metrics"
 )
 
 func TestExecutor_Run_NilWorkflow(t *testing.T) {
@@ -463,5 +464,65 @@ func TestRetry_TimeoutDuringBackoff(t *testing.T) {
 	}
 	if elapsed > 300*time.Millisecond {
 		t.Fatalf("expected retry loop to abort around 80ms, but took %v", elapsed)
+	}
+}
+
+func TestExecutor_MetricsCollection(t *testing.T) {
+	m := metrics.ResetForTesting()
+
+	wf := &Workflow{
+		ID:     "metrics-wf",
+		Status: StatusActive,
+		Trigger: Trigger{
+			Type: TriggerWebhook,
+			Config: map[string]interface{}{
+				"initial_step": "step1",
+			},
+		},
+		Steps: []Step{
+			{
+				ID:     "step1",
+				Action: "logger.info",
+				Params: map[string]interface{}{
+					"message": "testing metrics collection",
+				},
+			},
+		},
+	}
+
+	executor := NewExecutor(wf, connectors.Registry)
+	err := executor.Run(context.Background(), ExecutionContext{})
+	if err != nil {
+		t.Fatalf("expected workflow to succeed, got: %v", err)
+	}
+
+	families, err := m.Registry.Gather()
+	if err != nil {
+		t.Fatalf("failed to gather metrics: %v", err)
+	}
+
+	foundWorkflow := false
+	foundStep := false
+
+	for _, fam := range families {
+		if fam.GetName() == "owlflow_workflow_executions_total" {
+			foundWorkflow = true
+			if len(fam.GetMetric()) != 1 {
+				t.Errorf("expected 1 workflow metric, got %d", len(fam.GetMetric()))
+			}
+		}
+		if fam.GetName() == "owlflow_step_executions_total" {
+			foundStep = true
+			if len(fam.GetMetric()) != 1 {
+				t.Errorf("expected 1 step metric, got %d", len(fam.GetMetric()))
+			}
+		}
+	}
+
+	if !foundWorkflow {
+		t.Errorf("expected owlflow_workflow_executions_total to be recorded")
+	}
+	if !foundStep {
+		t.Errorf("expected owlflow_step_executions_total to be recorded")
 	}
 }

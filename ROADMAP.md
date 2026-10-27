@@ -57,5 +57,3 @@ This document serves as the **living product roadmap** for OwlFlow tracking futu
 
 - [ ] **OpenTelemetry (OTel) Distributed Tracing**
   - Emit W3C TraceContext spans across workflow steps, external connector HTTP requests, and trigger invocations for end-to-end distributed tracing.
-- [ ] **Prometheus Metrics Exporter**
-  - Native metrics endpoint (`/metrics`) exposing workflow execution durations, step success/failure rates, active triggers, and connector latencies.

@@ -23,9 +23,11 @@ import (
 	"github.com/divmora/owlflow/internal/connectors"
 	"github.com/divmora/owlflow/internal/core"
 	"github.com/divmora/owlflow/internal/logging"
+	"github.com/divmora/owlflow/internal/metrics"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gopkg.in/yaml.v3"
 )
 
@@ -61,16 +63,24 @@ func (a *API) SetupRouter() *gin.Engine {
 		gin.DefaultErrorWriter = log.Writer()
 	}
 	r := gin.Default()
+	r.Use(metrics.Middleware())
 
 	// Kubernetes and container health probes
 	r.GET("/healthz", a.handleHealthz)
 	r.GET("/readyz", a.handleReadyz)
 	r.GET("/health", a.handleHealthz)
 
+	// Prometheus metrics
+	r.GET("/metrics", a.handleMetrics)
+
 	// Webhook ingress
 	r.POST("/webhook/:id", a.handleWebhook)
 
 	return r
+}
+
+func (a *API) handleMetrics(c *gin.Context) {
+	promhttp.HandlerFor(metrics.GetMetrics().Registry, promhttp.HandlerOpts{}).ServeHTTP(c.Writer, c.Request)
 }
 
 func (a *API) handleHealthz(c *gin.Context) {

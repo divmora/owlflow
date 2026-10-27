@@ -670,6 +670,29 @@ func TestHealthCheckEndpoints(t *testing.T) {
 	}
 }
 
+func TestMetricsEndpoint(t *testing.T) {
+	api := NewAPI()
+	router := api.SetupRouter()
+
+	// Make an initial request to trigger HTTP telemetry recording
+	reqHealth := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	wHealth := httptest.NewRecorder()
+	router.ServeHTTP(wHealth, reqHealth)
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected /metrics HTTP 200, got %d", w.Code)
+	}
+
+	body := w.Body.String()
+	if !strings.Contains(body, "owlflow_http_requests_total") {
+		t.Errorf("expected /metrics body to expose owlflow_ metrics, got:\n%s", body)
+	}
+}
+
 func TestHandleWebhook_HMACAuthenticationAndDoubleRead(t *testing.T) {
 	dir := setupTestWorkflowDir(t)
 

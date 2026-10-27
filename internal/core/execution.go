@@ -10,6 +10,7 @@ import (
 
 	"github.com/divmora/owlflow/internal/connectors"
 	"github.com/divmora/owlflow/internal/logging"
+	"github.com/divmora/owlflow/internal/metrics"
 )
 
 type ExecutionContext struct {
@@ -49,11 +50,23 @@ func NewExecutor(wf *Workflow, connectors map[string]connectors.Connector) *Exec
 	}
 }
 
-func (e *Executor) Run(ctx context.Context, initialData ExecutionContext) error {
+func (e *Executor) Run(ctx context.Context, initialData ExecutionContext) (err error) {
 	logging.Init()
 	if e.Workflow == nil {
 		return fmt.Errorf("workflow cannot be nil")
 	}
+
+	wfID := e.Workflow.ID
+	start := time.Now()
+	hasStepFailure := false
+	defer func() {
+		duration := time.Since(start).Seconds()
+		status := "success"
+		if err != nil || hasStepFailure {
+			status = "failure"
+		}
+		metrics.GetMetrics().RecordWorkflow(wfID, status, duration)
+	}()
 
 	if e.Workflow.StepsMap == nil {
 		e.Workflow.InitStepsMap()
@@ -104,9 +117,10 @@ func (e *Executor) Run(ctx context.Context, initialData ExecutionContext) error 
 		}
 
 		// Execute step with isolated context
-		output, err := e.executeStep(ctx, step, state.Context.Copy())
-		if err != nil {
-			log.Printf("[Executor] Error executing step %s: %v", currentStepID, err)
+		output, stepErr := e.executeStep(ctx, step, state.Context.Copy())
+		if stepErr != nil {
+			hasStepFailure = true
+			log.Printf("[Executor] Error executing step %s: %v", currentStepID, stepErr)
 			continue
 		}
 
@@ -175,10 +189,24 @@ func (e *Executor) RunScheduled() error {
 	return e.Run(context.Background(), execData)
 }
 
-func (e *Executor) executeStep(ctx context.Context, step *Step, execData ExecutionContext) (interface{}, error) {
+func (e *Executor) executeStep(ctx context.Context, step *Step, execData ExecutionContext) (output interface{}, err error) {
 	if step == nil {
 		return nil, fmt.Errorf("step cannot be nil")
 	}
+
+	start := time.Now()
+	wfID := ""
+	if e.Workflow != nil {
+		wfID = e.Workflow.ID
+	}
+	defer func() {
+		duration := time.Since(start).Seconds()
+		status := "success"
+		if err != nil {
+			status = "failure"
+		}
+		metrics.GetMetrics().RecordStep(wfID, step.ID, step.Action, status, duration)
+	}()
 
 	stepCtx := ctx
 	if step.Timeout > 0 {
@@ -212,7 +240,6 @@ func (e *Executor) executeStep(ctx context.Context, step *Step, execData Executi
 	}
 
 	// Execute with retries
-	var output interface{}
 	err = retryWithContext(stepCtx, step, func() error {
 		result, err := connector.Execute(parts[1], params)
 		if err != nil {
