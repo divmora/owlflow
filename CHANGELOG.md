@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.0](https://github.com/divmora/owlflow/compare/v0.3.1...v0.4.0) (2026-10-27)
+
+
+### Features
+
+* **metrics:** add native Prometheus metrics exporter (/metrics) ([#61](https://github.com/divmora/owlflow/issues/61)) ([22f8110](https://github.com/divmora/owlflow/commit/22f8110acb6eafedaf047c81be6777eeb24b252b))
+* **server:** robust liveness and readiness probes (/healthz & /readyz) ([#62](https://github.com/divmora/owlflow/issues/62)) ([3429ab5](https://github.com/divmora/owlflow/commit/3429ab50dc97876c257fa3d424f5b8ff297f5a36))
+* **server:** support Standard Webhooks HMAC signing tokens ([#59](https://github.com/divmora/owlflow/issues/59)) ([e7f2ffa](https://github.com/divmora/owlflow/commit/e7f2ffa0e5b6f509a2a024e24014622901c6891a))
+
 ## [0.3.1](https://github.com/divmora/owlflow/compare/v0.3.0...v0.3.1) (2026-10-15)
 
 
