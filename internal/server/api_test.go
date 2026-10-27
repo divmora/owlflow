@@ -3,6 +3,7 @@ package server
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -11,8 +12,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/divmora/owlflow/internal/core"
 	"github.com/gin-gonic/gin"
@@ -410,6 +413,227 @@ func TestVerifyWebhook_ConstantTimeComparison(t *testing.T) {
 
 		if err := api.verifyWebhook(c, wf); err == nil {
 			t.Errorf("expected HMAC verification to fail for invalid signature, got nil")
+		}
+	})
+}
+
+func TestVerifyWebhook_StandardWebhooks(t *testing.T) {
+	dir := setupTestWorkflowDir(t)
+
+	// Add a workflow with a whsec_ base64 secret
+	rawKey := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
+	b64Key := base64.StdEncoding.EncodeToString(rawKey)
+	whsecSecret := "whsec_" + b64Key
+
+	wfYaml := fmt.Sprintf(`
+id: svix-wf
+name: Standard Webhooks Workflow
+status: active
+trigger:
+  type: webhook
+  config:
+    initial_step: step1
+    secret: %s
+steps:
+  - id: step1
+    action: logger.info
+    params:
+      message: "standard webhook"
+`, whsecSecret)
+
+	if err := os.WriteFile(filepath.Join(dir, "svix-wf.yaml"), []byte(wfYaml), 0644); err != nil {
+		t.Fatalf("failed to create test workflow: %v", err)
+	}
+
+	api := NewAPI()
+	api.WorkflowConfigPath = dir
+	router := api.SetupRouter()
+
+	computeSig := func(msgID, ts string, body []byte, key []byte) string {
+		mac := hmac.New(sha256.New, key)
+		mac.Write([]byte(msgID + "." + ts + "."))
+		mac.Write(body)
+		return base64.StdEncoding.EncodeToString(mac.Sum(nil))
+	}
+
+	payload := `{"event":"merge_request","action":"open"}`
+	msgID := "msg_2d98yfnk2j390fn"
+	nowTS := strconv.FormatInt(time.Now().Unix(), 10)
+	validSig := computeSig(msgID, nowTS, []byte(payload), rawKey)
+
+	t.Run("Valid Standard Webhook signature succeeds via API router", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhook/svix-wf", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("webhook-id", msgID)
+		req.Header.Set("webhook-timestamp", nowTS)
+		req.Header.Set("webhook-signature", "v1,"+validSig)
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusAccepted && w.Code != http.StatusOK {
+			t.Errorf("expected HTTP 202/200, got %d. Body: %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("Valid Standard Webhook signature with multiple signatures (key rotation) succeeds", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhook/svix-wf", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("webhook-id", msgID)
+		req.Header.Set("webhook-timestamp", nowTS)
+		req.Header.Set("webhook-signature", "v1,oldInvalidSig123 v1,"+validSig)
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusAccepted && w.Code != http.StatusOK {
+			t.Errorf("expected HTTP 202/200, got %d. Body: %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("Valid Standard Webhook signature with raw string secret succeeds", func(t *testing.T) {
+		// active-wf has secret: supersecret123
+		rawSecret := []byte("supersecret123")
+		sig := computeSig(msgID, nowTS, []byte(payload), rawSecret)
+
+		req := httptest.NewRequest(http.MethodPost, "/webhook/active-wf", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("webhook-id", msgID)
+		req.Header.Set("webhook-timestamp", nowTS)
+		req.Header.Set("webhook-signature", "v1,"+sig)
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusAccepted && w.Code != http.StatusOK {
+			t.Errorf("expected HTTP 202/200, got %d. Body: %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("Invalid signature returns 401 Unauthorized", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhook/svix-wf", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("webhook-id", msgID)
+		req.Header.Set("webhook-timestamp", nowTS)
+		req.Header.Set("webhook-signature", "v1,bogussignature123")
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("expected HTTP 401, got %d. Body: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), "invalid webhook signature") {
+			t.Errorf("expected body to contain 'invalid webhook signature', got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("Tampered payload body returns 401 Unauthorized", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhook/svix-wf", strings.NewReader(`{"event":"tampered"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("webhook-id", msgID)
+		req.Header.Set("webhook-timestamp", nowTS)
+		req.Header.Set("webhook-signature", "v1,"+validSig)
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("expected HTTP 401 for tampered body, got %d. Body: %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("Expired timestamp (> 5 minutes) returns 401 Unauthorized", func(t *testing.T) {
+		oldTS := strconv.FormatInt(time.Now().Unix()-305, 10)
+		expiredSig := computeSig(msgID, oldTS, []byte(payload), rawKey)
+
+		req := httptest.NewRequest(http.MethodPost, "/webhook/svix-wf", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("webhook-id", msgID)
+		req.Header.Set("webhook-timestamp", oldTS)
+		req.Header.Set("webhook-signature", "v1,"+expiredSig)
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("expected HTTP 401 for expired timestamp, got %d. Body: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), "outside tolerance window") {
+			t.Errorf("expected body to mention outside tolerance window, got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("Future timestamp (> 5 minutes) returns 401 Unauthorized", func(t *testing.T) {
+		futureTS := strconv.FormatInt(time.Now().Unix()+305, 10)
+		futureSig := computeSig(msgID, futureTS, []byte(payload), rawKey)
+
+		req := httptest.NewRequest(http.MethodPost, "/webhook/svix-wf", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("webhook-id", msgID)
+		req.Header.Set("webhook-timestamp", futureTS)
+		req.Header.Set("webhook-signature", "v1,"+futureSig)
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("expected HTTP 401 for future timestamp, got %d. Body: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), "outside tolerance window") {
+			t.Errorf("expected body to mention outside tolerance window, got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("Missing webhook-id header returns 401 Unauthorized", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhook/svix-wf", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("webhook-timestamp", nowTS)
+		req.Header.Set("webhook-signature", "v1,"+validSig)
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("expected HTTP 401, got %d", w.Code)
+		}
+		if !strings.Contains(w.Body.String(), "missing webhook-id or webhook-timestamp") {
+			t.Errorf("expected missing header error, got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("Missing webhook-timestamp header returns 401 Unauthorized", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhook/svix-wf", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("webhook-id", msgID)
+		req.Header.Set("webhook-signature", "v1,"+validSig)
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("expected HTTP 401, got %d", w.Code)
+		}
+		if !strings.Contains(w.Body.String(), "missing webhook-id or webhook-timestamp") {
+			t.Errorf("expected missing header error, got: %s", w.Body.String())
+		}
+	})
+
+	t.Run("Invalid non-numeric webhook-timestamp returns 401 Unauthorized", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/webhook/svix-wf", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("webhook-id", msgID)
+		req.Header.Set("webhook-timestamp", "not-a-number")
+		req.Header.Set("webhook-signature", "v1,"+validSig)
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("expected HTTP 401, got %d", w.Code)
+		}
+		if !strings.Contains(w.Body.String(), "invalid webhook-timestamp") {
+			t.Errorf("expected invalid timestamp error, got: %s", w.Body.String())
 		}
 	})
 }

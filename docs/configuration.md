@@ -95,9 +95,10 @@ trigger:
 ```
 
 #### Webhook Authentication & Security:
-1. **GitLab Webhook Token**: If `X-Gitlab-Token` header is present, OwlFlow compares it against `secret`.
-2. **GitHub HMAC SHA-256**: If `X-Hub-Signature-256` header is present (`sha256=<hex>`), OwlFlow calculates the HMAC-SHA256 of the raw body using `secret` and validates it with constant-time comparison (`hmac.Equal`).
-3. **No Secret**: If `secret` is omitted or empty, all incoming POST requests to the webhook route are accepted.
+1. **Standard Webhooks Signing Tokens (GitLab & Svix)**: If `webhook-signature` header is present (`v1,<base64>`), OwlFlow extracts `webhook-id` and `webhook-timestamp`, enforces a 5-minute replay tolerance window, decodes the key (supporting `whsec_<base64>` tokens as well as raw strings), computes the HMAC-SHA256 of `${webhook-id}.${webhook-timestamp}.${raw_body}`, and verifies the signature using constant-time comparison.
+2. **GitLab Legacy Webhook Token**: If `X-Gitlab-Token` header is present, OwlFlow compares it against `secret` using constant-time comparison.
+3. **GitHub HMAC SHA-256**: If `X-Hub-Signature-256` header is present (`sha256=<hex>`), OwlFlow calculates the HMAC-SHA256 of the raw body using `secret` and validates it with constant-time comparison (`hmac.Equal`).
+4. **No Secret**: If `secret` is omitted or empty, all incoming POST requests to the webhook route are accepted.
 
 ---
 

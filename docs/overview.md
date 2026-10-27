@@ -50,7 +50,7 @@ OwlFlow is divided into distinct, decoupled subsystems:
 - **Webhook Trigger (`type: "webhook"`)**:
   - Implemented via a high-throughput Gin router.
   - Automatically loads and parses request bodies (JSON, query strings, form data) and headers into the `TriggerData` context.
-  - Supports token authentication (`X-Gitlab-Token`) and HMAC SHA-256 signature verification (`X-Hub-Signature-256`).
+  - Supports Standard Webhooks signing tokens (`webhook-signature` / `whsec_...` for GitLab & Svix), legacy token authentication (`X-Gitlab-Token`), and GitHub HMAC SHA-256 signature verification (`X-Hub-Signature-256`).
 - **Schedule Trigger (`type: "schedule"`)**:
   - Powered by `robfig/cron/v3` supporting second-level cron granularity (6-field syntax).
   - Handles timezone conversion via Go's `time.LoadLocation`.

@@ -290,6 +290,9 @@ Resources:
               - Authorization
               - X-Gitlab-Token
               - X-Hub-Signature-256
+              - webhook-id
+              - webhook-timestamp
+              - webhook-signature
             MaxAge: 300
           - !Ref "AWS::NoValue"
 

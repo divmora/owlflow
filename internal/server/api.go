@@ -6,6 +6,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -260,7 +262,70 @@ func (a *API) verifyWebhook(c *gin.Context, wf *core.Workflow) error {
 		return nil // No secret configured
 	}
 
-	// GitLab Check
+	// 1. Standard Webhooks Check (GitLab Signing Tokens / Svix)
+	webhookSig := c.GetHeader("webhook-signature")
+	if webhookSig != "" {
+		webhookID := c.GetHeader("webhook-id")
+		webhookTS := c.GetHeader("webhook-timestamp")
+		if webhookID == "" || webhookTS == "" {
+			return fmt.Errorf("missing webhook-id or webhook-timestamp")
+		}
+
+		ts, err := strconv.ParseInt(webhookTS, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid webhook-timestamp")
+		}
+		now := time.Now().Unix()
+		diff := now - ts
+		if diff < -300 || diff > 300 {
+			return fmt.Errorf("webhook timestamp outside tolerance window")
+		}
+
+		body, err := a.getRequestBody(c)
+		if err != nil {
+			return fmt.Errorf("failed to read body")
+		}
+
+		// Handle Standard Webhooks secret: strip whsec_ prefix and base64-decode the 32-byte key.
+		// If whsec_ prefix is not present, use raw secret bytes.
+		keyBytes := []byte(secret)
+		if strings.HasPrefix(secret, "whsec_") {
+			trimmedSecret := strings.TrimPrefix(secret, "whsec_")
+			if decoded, err := base64.StdEncoding.DecodeString(trimmedSecret); err == nil && len(decoded) > 0 {
+				keyBytes = decoded
+			} else if decoded, err := base64.RawStdEncoding.DecodeString(trimmedSecret); err == nil && len(decoded) > 0 {
+				keyBytes = decoded
+			}
+		}
+
+		mac := hmac.New(sha256.New, keyBytes)
+		mac.Write([]byte(webhookID))
+		mac.Write([]byte("."))
+		mac.Write([]byte(webhookTS))
+		mac.Write([]byte("."))
+		mac.Write(body)
+		expectedSig := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+
+		signatures := strings.Fields(webhookSig)
+		matched := false
+		for _, sig := range signatures {
+			sig = strings.Trim(sig, ", ")
+			parts := strings.SplitN(sig, ",", 2)
+			if len(parts) == 2 && parts[0] == "v1" {
+				if subtle.ConstantTimeCompare([]byte(parts[1]), []byte(expectedSig)) == 1 {
+					matched = true
+					break
+				}
+			}
+		}
+
+		if !matched {
+			return fmt.Errorf("invalid webhook signature")
+		}
+		return nil
+	}
+
+	// 2. GitLab Legacy Secret Token Check
 	gitlabToken := c.GetHeader("X-Gitlab-Token")
 	if gitlabToken != "" {
 		if subtle.ConstantTimeCompare([]byte(gitlabToken), []byte(secret)) != 1 {
@@ -269,7 +334,7 @@ func (a *API) verifyWebhook(c *gin.Context, wf *core.Workflow) error {
 		return nil
 	}
 
-	// Get request signature (GitHub-style example)
+	// 3. GitHub HMAC-SHA256 Signature Check
 	signature := c.GetHeader("X-Hub-Signature-256")
 	if signature == "" {
 		return fmt.Errorf("missing signature")
