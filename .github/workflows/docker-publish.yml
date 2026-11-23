@@ -17,6 +17,10 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   ci-cd:
     uses: divmora/.github/.github/workflows/docker-publish.yml@main
