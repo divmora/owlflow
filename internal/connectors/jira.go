@@ -483,7 +483,7 @@ func (j *JiraConnector) makeRequest(client *http.Client, method, url, username, 
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
