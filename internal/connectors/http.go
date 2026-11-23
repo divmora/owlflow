@@ -324,7 +324,7 @@ func (h *HTTPConnector) Execute(action string, params map[string]interface{}) (i
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Limit response reading to 10MB to avoid memory exhaustion
 	const maxResponseBodyBytes = 10 * 1024 * 1024
